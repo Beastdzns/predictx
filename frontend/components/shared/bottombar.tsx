@@ -15,7 +15,7 @@ export default function Bottombar() {
   const [selected, setSelected] = useState('home');
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 bg-black border-t border-yellow-500/20 backdrop-blur-sm z-50">
+    <div className="fixed -bottom-0.5 left-0 right-0 bg-black border-t border-yellow-500/20 backdrop-blur-sm z-50">
       <div className="flex items-center justify-around px-4 py-3 max-w-md mx-auto">
         {navItems.map((item, index) => {
           const Icon = item.icon;
@@ -47,7 +47,7 @@ export default function Bottombar() {
                     animate={{ opacity: 1, scale: 1 }}
                     exit={{ opacity: 0, scale: 0.8 }}
                     transition={{ duration: 0.3, ease: [0.23, 1, 0.32, 1] }}
-                    className="absolute inset-0 bg-yellow-400/10 rounded-xl"
+                    className="absolute inset-0 rounded-xl"
                   />
                 )}
               </AnimatePresence>

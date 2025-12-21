@@ -143,13 +143,43 @@
     @apply border-border outline-ring/50;
   }
 
+  html,
   body {
-    @apply bg-background text-foreground font-sans;
+    @apply font-sans;
+  }
+
+  html::-webkit-scrollbar,
+  body::-webkit-scrollbar,
+  *::-webkit-scrollbar {
+    display: none;
+    width: 0;
+    height: 0;
+  }
+
+  html,
+  body,
+  * {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
   }
 
   h1,
   h2,
   h3 {
     @apply font-serif;
+  }
+}
+
+/* =========================
+   UTILITIES
+   ========================= */
+@layer utilities {
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+  
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
   }
 }

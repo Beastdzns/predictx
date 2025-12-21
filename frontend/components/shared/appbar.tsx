@@ -29,7 +29,7 @@ export default function Appbar() {
     const [selectedCategory, setSelectedCategory] = useState('trending');
 
     return (
-        <div className="sticky top-0 w-full bg-black border-b border-yellow-500/20 z-50 backdrop-blur-sm">
+        <div className="fixed top-0 left-0 right-0 w-full bg-black border-b border-yellow-500/20 z-50 backdrop-blur-sm">
             {/* Top Bar */}
             <div className="flex items-center justify-between px-6 py-4">
                 {/* Logo */}
@@ -80,7 +80,7 @@ export default function Appbar() {
                                 group relative flex items-center gap-2 px-4 py-1 rounded-lg
                                 whitespace-nowrap
                                 ${selectedCategory === category.id
-                                    ? 'text-white shadow-sm shadow-yellow-400/30'
+                                    ? 'font-serif text-white shadow-sm shadow-yellow-400/30'
                                     : 'bg-black text-white hover:bg-zinc-800'
                                 }
                             `}

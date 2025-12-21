@@ -27,10 +27,10 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="en">
+    <html lang="en" className="scrollbar-hide">
       <body className={`${varelaRound.variable} ${robotoSlab.variable} bg-zinc-950 min-h-screen scrollbar-hide`}>
         <Appbar />
-        <main className="pb-20">
+        <main className="pt-32 pb-24 scrollbar-hide">
           {children}
         </main>
         <Bottombar />

@@ -1,18 +1,33 @@
 'use client';
 
-import { useState } from 'react';
-import { Home, Search, Users, User } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Home, Search, Wallet, User } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useRouter, usePathname } from 'next/navigation';
 
 const navItems = [
-  { id: 'home', label: 'Home', icon: Home },
-  { id: 'search', label: 'Search', icon: Search },
-  { id: 'social', label: 'Social', icon: Users },
-  { id: 'profile', label: 'Profile', icon: User },
+  { id: 'home', label: 'Home', icon: Home, href: '/' },
+  { id: 'search', label: 'Search', icon: Search, href: '/search' },
+  { id: 'wallet', label: 'Wallet', icon: Wallet, href: '/wallet' },
+  { id: 'profile', label: 'Profile', icon: User, href: '/profile' },
 ];
 
 export default function Bottombar() {
+  const router = useRouter();
+  const pathname = usePathname();
   const [selected, setSelected] = useState('home');
+
+  useEffect(() => {
+    const currentItem = navItems.find(item => item.href === pathname);
+    if (currentItem) {
+      setSelected(currentItem.id);
+    }
+  }, [pathname]);
+
+  const handleNavigation = (item: typeof navItems[0]) => {
+    setSelected(item.id);
+    router.push(item.href);
+  };
 
   return (
     <div className="fixed -bottom-0.5 left-0 right-0 bg-black border-t border-yellow-500/20 backdrop-blur-sm z-50">
@@ -36,7 +51,7 @@ export default function Bottombar() {
                 transition: { duration: 0.2, ease: [0.23, 1, 0.32, 1] }
               }}
               whileTap={{ scale: 0.95 }}
-              onClick={() => setSelected(item.id)}
+              onClick={() => handleNavigation(item)}
               className="group flex flex-col items-center gap-1 px-4 py-2 rounded-xl relative"
             >
               {/* Background glow for selected item */}

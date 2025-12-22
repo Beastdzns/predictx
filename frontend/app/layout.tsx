@@ -1,8 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import { Varela_Round, Roboto_Slab } from 'next/font/google';
-import Appbar from '@/components/shared/appbar';
-import Bottombar from '@/components/shared/bottombar';
+import Providers from './providers';
 
 const varelaRound = Varela_Round({
   subsets: ['latin'],
@@ -19,6 +18,9 @@ const robotoSlab = Roboto_Slab({
 export const metadata: Metadata = {
   title: "x402PM",
   description: "x402 Predictions Market",
+  other: {
+    'Content-Security-Policy': "default-src 'self'; connect-src 'self' https://*.privy.io https://*.walletconnect.com https://*.walletconnect.org wss://*.walletconnect.com wss://*.walletconnect.org https://cloudflare-eth.com https://mainnet.infura.io https://rpc.ankr.com; script-src 'self' 'unsafe-eval' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:;",
+  },
 };
 
 export default function RootLayout({
@@ -27,13 +29,12 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="en" className="scrollbar-hide">
-      <body className={`${varelaRound.variable} ${robotoSlab.variable} bg-zinc-950 min-h-screen scrollbar-hide`}>
-        <Appbar />
-        <main className="pt-32 pb-24 scrollbar-hide">
+    <html lang="en" className="scrollbar-hide" suppressHydrationWarning>
+      <body className={`${varelaRound.variable} ${robotoSlab.variable} bg-zinc-950 min-h-screen scrollbar-hide`} suppressHydrationWarning>
+        <Providers>
           {children}
-        </main>
-        <Bottombar />
+        </Providers>
+        <div id="privy-portal" />
       </body>
     </html>
   )

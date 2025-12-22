@@ -4,6 +4,8 @@ import { useState } from 'react';
 import Image from 'next/image';
 import { Button } from '@/components/ui/button';
 import { motion, AnimatePresence } from 'framer-motion';
+import { usePrivy, useLogin, useLogout } from '@privy-io/react-auth';
+import { useRouter } from 'next/navigation';
 
 const categories = [
     { id: 'trending', label: 'Trending', icon: '🔥' },
@@ -27,6 +29,15 @@ const categories = [
 
 export default function Appbar() {
     const [selectedCategory, setSelectedCategory] = useState('trending');
+    const router = useRouter();
+    const { ready, authenticated, user } = usePrivy();
+    const { logout } = useLogout();
+    const { login } = useLogin({
+        onComplete({ user, isNewUser }) {
+            console.log('Login successful', { user, isNewUser });
+            // Don't auto-redirect, let users stay on current page
+        },
+    });
 
     return (
         <div className="fixed top-0 left-0 right-0 w-full bg-black border-b border-yellow-500/20 z-50 backdrop-blur-sm">
@@ -34,24 +45,48 @@ export default function Appbar() {
             <div className="flex items-center justify-between px-6 py-4">
                 {/* Logo */}
                 <div className="flex items-center gap-3">
-                        <img
-                            src="/logo-yellow.png"
-                            alt="Logo"
-                            className="relative w-28 h-10 object-contain transition-transform duration-300 hover:scale-110"
-                        />
+                    <img
+                        src="/logo-yellow.png"
+                        alt="Logo"
+                        className="relative w-28 h-10 object-contain transition-transform duration-300 hover:scale-110 cursor-pointer"
+                        onClick={() => router.push('/')}
+                    />
                 </div>
 
                 {/* Auth Buttons */}
                 <div className="flex items-center gap-3">
-                    <Button
-                        variant="ghost"
-                        className="text-yellow-400 hover:text-yellow-400 hover:bg-yellow-400/10 transition-all duration-300 border border-yellow-400/30"
-                    >
-                        Login
-                    </Button>
-                    <Button className="bg-yellow-400 text-black hover:bg-yellow-500 transition-all duration-300 shadow-lg shadow-yellow-400/20 font-semibold">
-                        Sign Up
-                    </Button>
+                    {ready && authenticated ? (
+                        <>
+                            <span className="text-yellow-400 text-sm hidden md:block">
+                                {user?.email?.address || user?.phone?.number || user?.wallet?.address?.slice(0, 6) + '...' + user?.wallet?.address?.slice(-4) || 'User'}
+                            </span>
+                            <Button
+                                variant="ghost"
+                                onClick={logout}
+                                className="text-yellow-400 hover:text-yellow-400 hover:bg-yellow-400/10 transition-all duration-300 border border-yellow-400/30"
+                            >
+                                Logout
+                            </Button>
+                        </>
+                    ) : (
+                        <>
+                            <Button
+                                variant="ghost"
+                                onClick={login}
+                                disabled={!ready}
+                                className="text-yellow-400 hover:text-yellow-400 hover:bg-yellow-400/10 transition-all duration-300 border border-yellow-400/30"
+                            >
+                                Login
+                            </Button>
+                            <Button
+                                onClick={login}
+                                disabled={!ready}
+                                className="bg-yellow-400 text-black hover:bg-yellow-500 transition-all duration-300 shadow-lg shadow-yellow-400/20 font-semibold"
+                            >
+                                Sign Up
+                            </Button>
+                        </>
+                    )}
                 </div>
             </div>
 

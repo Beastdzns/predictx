@@ -23,17 +23,15 @@ export default function Providers({ children }: { children: React.ReactNode }) {
       appId={appId}
       config={{
         embeddedWallets: {
-          createOnLogin: 'all-users',
+          ethereum: {
+            createOnLogin: 'all-users',
+          },
         },
         appearance: {
           theme: 'dark',
           accentColor: '#facc15',
         },
-        loginMethods: ['email', 'wallet', 'google', 'apple'],
-        // Add portal configuration to prevent hydration errors
-        _render: {
-          inDialog: true,
-        },
+        loginMethods: ['email', 'wallet', 'google', 'discord', 'github', 'twitter', 'sms', 'passkey'],
       }}
     >
       <div suppressHydrationWarning>

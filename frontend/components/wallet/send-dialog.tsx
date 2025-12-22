@@ -50,7 +50,7 @@ export function SendDialog({ open, onOpenChange, embeddedWallet }: SendDialogPro
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="bg-zinc-950 border-zinc-800 text-white max-w-sm">
+      <DialogContent className="bg-zinc-950 border-zinc-800 text-white max-w-md max-h-[85vh] overflow-hidden flex flex-col">
         <DialogHeader>
           <DialogTitle className="text-2xl font-bold text-yellow-400">
             Send Assets

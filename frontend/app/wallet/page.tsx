@@ -57,7 +57,7 @@ export default function WalletPage() {
 
   return (
     <AuthenticatedLayout>
-      <div className="px-6 py-8 pb-24">
+      <div className="px-6 pb-24">
         <h1 className="text-3xl font-bold text-yellow-400 mb-2">Wallet</h1>
         <p className="text-gray-400 text-sm mb-8">
           Manage your embedded wallet and assets

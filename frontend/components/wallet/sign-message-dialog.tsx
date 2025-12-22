@@ -48,7 +48,7 @@ export function SignMessageDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="bg-zinc-950 border-zinc-800 text-white max-w-sm">
+      <DialogContent className="bg-zinc-950 border-zinc-800 text-white max-w-md">
         <DialogHeader>
           <DialogTitle className="text-2xl font-bold text-yellow-400">
             Sign Message

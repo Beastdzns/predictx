@@ -1,12 +1,13 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { Home, Wallet, User, Users } from 'lucide-react';
+import { useEffect } from 'react';
+import { Wallet, User, Users, Compass } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useRouter, usePathname } from 'next/navigation';
+import { useNavigationStore } from '@/lib/store';
 
 const navItems = [
-  { id: 'home', label: 'Home', icon: Home, href: '/' },
+  { id: 'explore', label: 'Explore', icon: Compass, href: '/' },
   { id: 'social', label: 'Social', icon: Users, href: '/social' },
   { id: 'wallet', label: 'Wallet', icon: Wallet, href: '/wallet' },
   { id: 'profile', label: 'Profile', icon: User, href: '/profile' },
@@ -15,26 +16,26 @@ const navItems = [
 export default function Bottombar() {
   const router = useRouter();
   const pathname = usePathname();
-  const [selected, setSelected] = useState('home');
+  const { selectedBottomNav, setSelectedBottomNav } = useNavigationStore();
 
   useEffect(() => {
     const currentItem = navItems.find(item => item.href === pathname);
     if (currentItem) {
-      setSelected(currentItem.id);
+      setSelectedBottomNav(currentItem.id);
     }
-  }, [pathname]);
+  }, [pathname, setSelectedBottomNav]);
 
   const handleNavigation = (item: typeof navItems[0]) => {
-    setSelected(item.id);
+    setSelectedBottomNav(item.id);
     router.push(item.href);
   };
 
   return (
-    <div className="fixed -bottom-0.5 left-0 right-0 bg-black border-t border-yellow-500/20 backdrop-blur-sm z-50">
+    <div className="fixed -bottom-0.5 left-0 right-0 bg-black border-t border-yellow-500/20 backdrop-blur-sm z-10">
       <div className="flex items-center justify-around px-4 py-3 max-w-md mx-auto">
         {navItems.map((item, index) => {
           const Icon = item.icon;
-          const isSelected = selected === item.id;
+          const isSelected = selectedBottomNav === item.id;
 
           return (
             <motion.button

@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { motion, AnimatePresence } from 'framer-motion';
 import { usePrivy, useLogin, useLogout } from '@privy-io/react-auth';
 import { useRouter } from 'next/navigation';
+import { useNavigationStore } from '@/lib/store';
 
 const categories = [
     { id: 'trending', label: 'Trending', icon: '🔥' },
@@ -32,6 +33,7 @@ export default function Appbar() {
     const router = useRouter();
     const { ready, authenticated, user } = usePrivy();
     const { logout } = useLogout();
+    const { selectedBottomNav } = useNavigationStore();
     const { login } = useLogin({
         onComplete({ user, isNewUser }) {
             console.log('Login successful', { user, isNewUser });
@@ -39,8 +41,10 @@ export default function Appbar() {
         },
     });
 
+    const showCategories = selectedBottomNav === 'explore';
+
     return (
-        <div className="fixed top-0 left-0 right-0 w-full bg-black border-b border-yellow-500/20 z-50 backdrop-blur-sm">
+        <div className="fixed top-0 left-0 right-0 w-full bg-black border-b border-yellow-500/20 z-10 backdrop-blur-sm">
             {/* Top Bar */}
             <div className="flex items-center justify-between px-6 py-4">
                 {/* Logo */}
@@ -91,72 +95,96 @@ export default function Appbar() {
             </div>
 
             {/* Category Slider */}
-            <div className="relative overflow-x-auto scrollbar-hide">
-                <div className="flex items-center gap-2 px-4 pb-4">
-                    {categories.map((category, index) => (
-                        <motion.button
-                            key={category.id}
-                            initial={{ opacity: 0, y: -20 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            layout
+            <AnimatePresence mode="wait">
+                {showCategories && (
+                    <motion.div
+                        initial={{ height: 0, opacity: 0 }}
+                        animate={{ height: 'auto', opacity: 1 }}
+                        exit={{ height: 0, opacity: 0 }}
+                        transition={{
+                            duration: 0.4,
+                            ease: [0.23, 1, 0.32, 1]
+                        }}
+                        className="relative overflow-hidden"
+                    >
+                        <motion.div
+                            initial={{ y: -20 }}
+                            animate={{ y: 0 }}
+                            exit={{ y: -20 }}
                             transition={{
-                                duration: 0.4,
-                                delay: index * 0.05,
-                                ease: [0.23, 1, 0.32, 1],
-                                layout: { duration: 0.4, ease: [0.23, 1, 0.32, 1] }
+                                duration: 0.3,
+                                ease: [0.23, 1, 0.32, 1]
                             }}
-                            whileHover={{ 
-                                scale: 1.05,
-                                transition: { duration: 0.2, ease: [0.23, 1, 0.32, 1] }
-                            }}
-                            whileTap={{ scale: 0.95 }}
-                            onClick={() => setSelectedCategory(category.id)}
-                            className={`
-                                group relative flex items-center gap-2 px-4 py-1 rounded-lg
-                                whitespace-nowrap
-                                ${selectedCategory === category.id
-                                    ? 'font-serif text-white shadow-sm shadow-yellow-400/30'
-                                    : 'bg-black text-white hover:bg-zinc-800'
-                                }
-                            `}
+                            className="overflow-x-auto scrollbar-hide"
                         >
-                            <AnimatePresence mode="popLayout">
-                                {selectedCategory === category.id && (
-                                    <motion.span
-                                        initial={{ scale: 0, opacity: 0, width: 0 }}
-                                        animate={{ scale: 1, opacity: 1, width: 'auto' }}
-                                        exit={{ scale: 0, opacity: 0, width: 0 }}
+                            <div className="flex items-center gap-2 px-4 pb-4">
+                                {categories.map((category, index) => (
+                                    <motion.button
+                                        key={category.id}
+                                        initial={{ opacity: 0, y: -20 }}
+                                        animate={{ opacity: 1, y: 0 }}
+                                        layout
                                         transition={{
                                             duration: 0.4,
-                                            ease: [0.23, 1, 0.32, 1]
+                                            delay: index * 0.05,
+                                            ease: [0.23, 1, 0.32, 1],
+                                            layout: { duration: 0.4, ease: [0.23, 1, 0.32, 1] }
                                         }}
-                                        className="text-sm"
+                                        whileHover={{ 
+                                            scale: 1.05,
+                                            transition: { duration: 0.2, ease: [0.23, 1, 0.32, 1] }
+                                        }}
+                                        whileTap={{ scale: 0.95 }}
+                                        onClick={() => setSelectedCategory(category.id)}
+                                        className={`
+                                            group relative flex items-center gap-2 px-4 py-1 rounded-lg
+                                            whitespace-nowrap
+                                            ${selectedCategory === category.id
+                                                ? 'font-serif text-white shadow-sm shadow-yellow-400/30'
+                                                : 'bg-black text-white hover:bg-zinc-800'
+                                            }
+                                        `}
                                     >
-                                        {category.icon}
-                                    </motion.span>
-                                )}
-                            </AnimatePresence>
-                            
-                            <span className="text-sm font-medium">
-                                {category.label}
-                            </span>
+                                        <AnimatePresence mode="popLayout">
+                                            {selectedCategory === category.id && (
+                                                <motion.span
+                                                    initial={{ scale: 0, opacity: 0, width: 0 }}
+                                                    animate={{ scale: 1, opacity: 1, width: 'auto' }}
+                                                    exit={{ scale: 0, opacity: 0, width: 0 }}
+                                                    transition={{
+                                                        duration: 0.4,
+                                                        ease: [0.23, 1, 0.32, 1]
+                                                    }}
+                                                    className="text-sm"
+                                                >
+                                                    {category.icon}
+                                                </motion.span>
+                                            )}
+                                        </AnimatePresence>
+                                        
+                                        <span className="text-sm font-medium">
+                                            {category.label}
+                                        </span>
 
-                            {selectedCategory === category.id && (
-                                <motion.div
-                                    layoutId="categoryIndicator"
-                                    className="absolute -bottom-2 left-1/2 -translate-x-1/2 w-1 h-1 bg-yellow-400 rounded-full"
-                                    transition={{
-                                        type: "spring",
-                                        stiffness: 380,
-                                        damping: 30,
-                                        mass: 0.8
-                                    }}
-                                />
-                            )}
-                        </motion.button>
-                    ))}
-                </div>
-            </div>
+                                        {selectedCategory === category.id && (
+                                            <motion.div
+                                                layoutId="categoryIndicator"
+                                                className="absolute -bottom-2 left-1/2 -translate-x-1/2 w-1 h-1 bg-yellow-400 rounded-full"
+                                                transition={{
+                                                    type: "spring",
+                                                    stiffness: 380,
+                                                    damping: 30,
+                                                    mass: 0.8
+                                                }}
+                                            />
+                                        )}
+                                    </motion.button>
+                                ))}
+                            </div>
+                        </motion.div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
 
             {/* Hide scrollbar */}
             <style jsx>{`

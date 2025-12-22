@@ -93,7 +93,7 @@ export function ReceiveDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="bg-zinc-950 border-zinc-800 text-white max-w-sm max-h-[85vh] overflow-hidden flex flex-col">
+      <DialogContent className="bg-zinc-950 border-zinc-800 text-white max-w-md max-h-[85vh] overflow-hidden flex flex-col">
         <DialogHeader className="shrink-0">
           <DialogTitle className="text-2xl font-bold text-yellow-400">
             Receive Assets

@@ -21,6 +21,8 @@ export const metadata: Metadata = {
   other: {
     'Content-Security-Policy': "default-src 'self'; connect-src 'self' https://*.privy.io https://*.walletconnect.com https://*.walletconnect.org wss://*.walletconnect.com wss://*.walletconnect.org https://cloudflare-eth.com https://mainnet.infura.io https://rpc.ankr.com; script-src 'self' 'unsafe-eval' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:;",
   },
+  manifest: "/manifest.json",
+  themeColor: "#000000",
 };
 
 export default function RootLayout({
@@ -30,6 +32,9 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" className="scrollbar-hide" suppressHydrationWarning>
+      <head>
+        <link rel="apple-touch-icon" href="/icons/android-launchericon-192-192.png" />
+      </head>
       <body className={`${varelaRound.variable} ${robotoSlab.variable} bg-zinc-950 min-h-screen scrollbar-hide`} suppressHydrationWarning>
         <Providers>
           {children}

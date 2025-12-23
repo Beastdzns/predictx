@@ -9,7 +9,12 @@ export class KalshiAPI {
     if (category) params.append('category', category);
     if (tags && tags.length > 0) params.append('tags', tags.join(','));
     
-    const response = await fetch(`${BASE_URL}/series?${params.toString()}`);
+    const response = await fetch(`${BASE_URL}/series?${params.toString()}`, {
+      headers: {
+        "Accept": "application/json",
+      },
+      cache: "no-store",
+    });
     if (!response.ok) throw new Error('Failed to fetch series');
     return response.json();
   }
@@ -27,7 +32,12 @@ export class KalshiAPI {
     if (params.status) searchParams.append('status', params.status);
     if (params.cursor) searchParams.append('cursor', params.cursor);
     
-    const response = await fetch(`${BASE_URL}/markets?${searchParams.toString()}`);
+    const response = await fetch(`${BASE_URL}/markets?${searchParams.toString()}`, {
+      headers: {
+        "Accept": "application/json",
+      },
+      cache: "no-store",
+    });
     if (!response.ok) throw new Error('Failed to fetch markets');
     return response.json();
   }
@@ -47,7 +57,12 @@ export class KalshiAPI {
     if (params.with_nested_markets) searchParams.append('with_nested_markets', 'true');
     if (params.cursor) searchParams.append('cursor', params.cursor);
     
-    const response = await fetch(`${BASE_URL}/events?${searchParams.toString()}`);
+    const response = await fetch(`${BASE_URL}/events?${searchParams.toString()}`, {
+      headers: {
+        "Accept": "application/json",
+      },
+      cache: "no-store",
+    });
     if (!response.ok) throw new Error('Failed to fetch events');
     return response.json();
   }

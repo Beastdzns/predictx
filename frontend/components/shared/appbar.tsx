@@ -54,7 +54,12 @@ export default function Appbar() {
         // Fetch tags from API
         const fetchTags = async () => {
             try {
-                const response = await fetch('https://api.elections.kalshi.com/trade-api/v2/search/tags_by_categories');
+                const response = await fetch('https://api.elections.kalshi.com/trade-api/v2/search/tags_by_categories', {
+                    headers: {
+                        "Accept": "application/json",
+                    },
+                    cache: "no-store",
+                });
                 const data = await response.json();
                 if (data.tags_by_categories) {
                     setTagsByCategories(data.tags_by_categories);

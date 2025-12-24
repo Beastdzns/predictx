@@ -7,7 +7,7 @@ import { usePrivy, useLogin, useLogout } from '@privy-io/react-auth';
 import { useRouter } from 'next/navigation';
 import { useNavigationStore, useFilterStore } from '@/lib/store';
 import HowItWorksDialog from './how-it-works-dialog';
-import { HelpCircle } from 'lucide-react';
+import { HelpCircle, Download } from 'lucide-react';
 
 const topCategories = [
     { id: 'trending', label: 'Trending', icon: '🔥' },
@@ -42,6 +42,8 @@ export default function Appbar() {
     } = useFilterStore();
     
     const [howItWorksOpen, setHowItWorksOpen] = useState(false);
+    const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+    const [showInstallButton, setShowInstallButton] = useState(false);
     
     const { login } = useLogin({
         onComplete({ user, isNewUser }) {
@@ -67,6 +69,33 @@ export default function Appbar() {
         };
         fetchTags();
     }, [setTagsByCategories]);
+
+    // Handle PWA install prompt
+    useEffect(() => {
+        const handler = (e: Event) => {
+            e.preventDefault();
+            setDeferredPrompt(e);
+            setShowInstallButton(true);
+        };
+
+        window.addEventListener('beforeinstallprompt', handler);
+
+        return () => window.removeEventListener('beforeinstallprompt', handler);
+    }, []);
+
+    const handleInstallClick = async () => {
+        if (!deferredPrompt) return;
+
+        deferredPrompt.prompt();
+        const { outcome } = await deferredPrompt.userChoice;
+        
+        if (outcome === 'accepted') {
+            console.log('User accepted the install prompt');
+        }
+        
+        setDeferredPrompt(null);
+        setShowInstallButton(false);
+    };
 
     const showCategories = selectedBottomNav === 'explore';
 
@@ -94,6 +123,14 @@ export default function Appbar() {
                 <div className="flex items-center gap-3">
                     {ready && authenticated ? (
                         <>
+                            {showInstallButton && (
+                                <Button
+                                    onClick={handleInstallClick}
+                                    className="bg-yellow-400/10 text-yellow-400 hover:bg-yellow-400/20 transition-all duration-300 border border-yellow-400/30"
+                                >
+                                    <Download className="w-4 h-4" />
+                                </Button>
+                            )}
                             <span className="text-yellow-400 text-sm hidden md:block">
                                 {user?.email?.address || user?.phone?.number || user?.wallet?.address?.slice(0, 6) + '...' + user?.wallet?.address?.slice(-4) || 'User'}
                             </span>

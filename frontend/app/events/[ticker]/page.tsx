@@ -2,13 +2,36 @@
 
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { Event, Market, EventMetadata } from '@/lib/types';
+import { Event, Market, EventMetadata, Trade } from '@/lib/types';
 import { KalshiAPI } from '@/lib/api';
 import { motion } from 'framer-motion';
-import { ArrowLeft, Loader2, TrendingUp, ExternalLink, DollarSign } from 'lucide-react';
+import { ArrowLeft, Loader2, TrendingUp, ExternalLink, DollarSign, ChevronsUpDown, Check } from 'lucide-react';
 import MarketCard from '@/components/markets/market-card';
 import MarketCharts from '@/components/markets/market-charts';
+import MarketSentiment from '@/components/markets/market-sentiment';
 import { Button } from '@/components/ui/button';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover';
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from '@/components/ui/command';
+import { cn } from '@/lib/utils';
 import Image from 'next/image';
 
 export default function EventPage() {
@@ -21,6 +44,15 @@ export default function EventPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showAllMarkets, setShowAllMarkets] = useState(false);
+  const [selectedRulesMarket, setSelectedRulesMarket] = useState<Market | null>(null);
+  const [selectedTimelineMarket, setSelectedTimelineMarket] = useState<Market | null>(null);
+  const [rulesOpen, setRulesOpen] = useState(false);
+  const [timelineOpen, setTimelineOpen] = useState(false);
+  const [helpDialogOpen, setHelpDialogOpen] = useState(false);
+  const [recentTrades, setRecentTrades] = useState<Trade[]>([]);
+  const [tradesLoading, setTradesLoading] = useState(false);
+  const [sentimentData, setSentimentData] = useState<any>(null);
+  const [sentimentLoading, setSentimentLoading] = useState(false);
 
   useEffect(() => {
     const fetchEvent = async () => {
@@ -38,6 +70,12 @@ export default function EventPage() {
         if (eventResponse.events && eventResponse.events.length > 0) {
           const fetchedEvent = eventResponse.events[0];
           setEvent(fetchedEvent);
+
+          // Set first market as default for rules and timeline
+          if (fetchedEvent.markets && fetchedEvent.markets.length > 0) {
+            setSelectedRulesMarket(fetchedEvent.markets[0]);
+            setSelectedTimelineMarket(fetchedEvent.markets[0]);
+          }
 
           // Then fetch metadata using the event_ticker
           const metadataResponse = await KalshiAPI.getEventMetadata(fetchedEvent.event_ticker).catch(() => null);
@@ -59,6 +97,90 @@ export default function EventPage() {
       fetchEvent();
     }
   }, [ticker]);
+
+  // Fetch recent trades for all markets
+  useEffect(() => {
+    const fetchRecentTrades = async () => {
+      if (!event || !event.markets || event.markets.length === 0) return;
+      
+      setTradesLoading(true);
+      try {
+        const allTrades: Trade[] = [];
+        
+        // Fetch trades for each market (limit 5 per market)
+        for (const market of event.markets) {
+          try {
+            const tradesResponse = await KalshiAPI.getTrades({
+              ticker: market.ticker,
+              limit: 5
+            });
+            
+            if (tradesResponse.trades && tradesResponse.trades.length > 0) {
+              allTrades.push(...tradesResponse.trades);
+            }
+            
+            // Small delay to avoid rate limiting
+            await new Promise(resolve => setTimeout(resolve, 100));
+          } catch (err) {
+            console.error(`Failed to fetch trades for ${market.ticker}:`, err);
+          }
+        }
+        
+        // Sort by created_time (most recent first) and take top 20
+        const sortedTrades = allTrades
+          .sort((a, b) => new Date(b.created_time).getTime() - new Date(a.created_time).getTime())
+          .slice(0, 20);
+        
+        setRecentTrades(sortedTrades);
+      } catch (err) {
+        console.error('Error fetching trades:', err);
+      } finally {
+        setTradesLoading(false);
+      }
+    };
+    
+    fetchRecentTrades();
+  }, [event]);
+
+  // Fetch market sentiment analysis
+  useEffect(() => {
+    const fetchSentiment = async () => {
+      if (!event || !event.markets || event.markets.length === 0) return;
+      
+      setSentimentLoading(true);
+      try {
+        const response = await fetch('/api/sentiment', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            event: {
+              title: event.title,
+              category: event.category,
+              sub_title: event.sub_title,
+            },
+            markets: event.markets,
+            recentTrades: recentTrades,
+          }),
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          setSentimentData(data);
+        }
+      } catch (err) {
+        console.error('Error fetching sentiment:', err);
+      } finally {
+        setSentimentLoading(false);
+      }
+    };
+
+    // Only fetch sentiment after trades are fully loaded and if we don't have data yet
+    if (!tradesLoading && event && event.markets && event.markets.length > 0 && !sentimentData) {
+      fetchSentiment();
+    }
+  }, [event, tradesLoading, sentimentData]);
 
   if (loading) {
     return (
@@ -159,7 +281,7 @@ export default function EventPage() {
       </div>
 
       {/* Markets List */}
-      <div className="px-6 py-6 space-y-6">
+      <div className="px-6 py-3 space-y-4">
         {markets.length === 0 ? (
           <div className="bg-zinc-900 border border-zinc-800 rounded-lg p-8 text-center">
             <p className="text-white/60">No markets available for this event.</p>
@@ -188,50 +310,65 @@ export default function EventPage() {
                     )}
                   </div>
                 )}
-
-                {metadata.settlement_sources && metadata.settlement_sources.length > 0 && (
-                  <div className="space-y-2">
-                    <span className="text-white/50 text-sm">Settlement Sources:</span>
-                    <div className="flex flex-wrap gap-2">
-                      {metadata.settlement_sources.map((source, idx) => (
-                        <a
-                          key={idx}
-                          href={source.url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="inline-flex items-center gap-1 py-1 text-yellow-400 text-xs"
-                        >
-                          {source.name}
-                          <ExternalLink className="w-3 h-3" />
-                        </a>
-                      ))}
-                    </div>
-                  </div>
-                )}
               </motion.div>
             )}
 
-            {/* Beginner Helper */}
+            {/* Market Sentiment */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.28 }}
+            >
+              <MarketSentiment
+                sentiment={sentimentData?.sentiment || 'neutral'}
+                insights={sentimentData?.insights || ''}
+                recommendations={sentimentData?.recommendations || []}
+                loading={sentimentLoading}
+              />
+            </motion.div>
+
+            {/* Beginner Helper Button */}
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.3 }}
-              className="bg-yellow-400/5 border border-yellow-400/20 rounded-lg p-4"
             >
-              <div className="flex items-start gap-3">
-                <div className="shrink-0 w-8 h-8 rounded-full bg-yellow-400/10 flex items-center justify-center">
-                  <span className="text-yellow-400 text-sm font-bold">?</span>
-                </div>
-                <div className="flex-1 space-y-1">
-                  <h4 className="text-yellow-400 text-sm font-semibold">How Prediction Markets Work</h4>
-                  <p className="text-white/60 text-xs leading-relaxed">
-                    Trade shares priced 0-100¢. <span className="text-green-400 font-medium">YES shares</span> pay $1 if the outcome happens,
-                    <span className="text-red-400 font-medium"> NO shares</span> pay $1 if it doesn't. The price reflects the market's probability.
-                  </p>
-                </div>
-              </div>
+              <Button
+                onClick={() => setHelpDialogOpen(true)}
+                className="w-full bg-transparent text-yellow-400"
+              >
+                <span className="text-lg mr-2">?</span>
+                How Prediction Markets Work
+              </Button>
             </motion.div>
 
+            {/* Help Dialog */}
+            <Dialog open={helpDialogOpen} onOpenChange={setHelpDialogOpen}>
+              <DialogContent className="bg-zinc-900 border-yellow-400/30 text-white max-w-lg">
+                <DialogHeader>
+                  <DialogTitle className="text-yellow-400 text-xl">How Prediction Markets Work</DialogTitle>
+                </DialogHeader>
+                <div className="text-white/70 text-sm leading-relaxed space-y-3 pt-2">
+                  <p>
+                    Trade shares priced 0-100¢. Each share represents the probability of an outcome.
+                  </p>
+                  <p>
+                    <span className="text-green-400 font-semibold">YES shares</span> pay $1.00 if the outcome happens,
+                    $0 if it doesn't.
+                  </p>
+                  <p>
+                    <span className="text-red-400 font-semibold">NO shares</span> pay $1.00 if the outcome doesn't happen,
+                    $0 if it does.
+                  </p>
+                  <p>
+                    The price reflects the market's collective probability. For example, if YES shares trade at 30¢,
+                    the market believes there's a 30% chance the outcome will happen.
+                  </p>
+                </div>
+              </DialogContent>
+            </Dialog>
+
+            <h1 className='text-yellow-400 text-xl'>Markets</h1>
             <div className="grid grid-cols-1 gap-4">
               {displayedMarkets.map((market, index) => (
                 <MarketCard key={market.ticker} market={market} index={index} metadata={metadata} />
@@ -255,6 +392,342 @@ export default function EventPage() {
               </motion.div>
             )}
           </>
+        )}
+        {/* Rules Summary Section */}
+        {markets.length > 0 && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.35 }}
+            className="space-y-4 border-b pb-4 border-white/20"
+          >
+            <div className="flex justify-between gap-2">
+              <h3 className="text-yellow-400 font-semibold text-lg">Rules Summary</h3>
+
+              {/* Market Selector */}
+              <Popover open={rulesOpen} onOpenChange={setRulesOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    role="combobox"
+                    aria-expanded={rulesOpen}
+                    className="w-40 justify-between text-white bg-transparent outline-none border-none"
+                  >
+                    {selectedRulesMarket ? (
+                      <span className="truncate">
+                        {selectedRulesMarket.custom_strike
+                          ? String(Object.values(selectedRulesMarket.custom_strike)[0])
+                          : selectedRulesMarket.subtitle || selectedRulesMarket.title}
+                      </span>
+                    ) : (
+                      'Select market...'
+                    )}
+                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-40 p-0 bg-zinc-900 border-zinc-700">
+                  <Command className="bg-zinc-900">
+                    <CommandInput placeholder="Search markets..." className="text-white" />
+                    <CommandList>
+                      <CommandEmpty>No market found.</CommandEmpty>
+                      <CommandGroup>
+                        {markets.map((market) => {
+                          const label = market.custom_strike
+                            ? Object.values(market.custom_strike)[0]
+                            : market.subtitle || market.title;
+
+                          return (
+                            <CommandItem
+                              key={market.ticker}
+                              value={String(label)}
+                              onSelect={() => {
+                                setSelectedRulesMarket(market);
+                                setRulesOpen(false);
+                              }}
+                              className="text-white hover:bg-zinc-800"
+                            >
+                              <span className={cn(
+                                ' text-lg',
+                                selectedRulesMarket?.ticker === market.ticker
+                                  ? 'opacity-100'
+                                  : 'opacity-0'
+                              )}>•</span>
+                              <span className="truncate">{String(label)}</span>
+                            </CommandItem>
+                          );
+                        })}
+                      </CommandGroup>
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
+            </div>
+
+            {/* Rules Display */}
+            {selectedRulesMarket && (
+              <div className="space-y-3">
+                {selectedRulesMarket.rules_primary && (
+                  <div className="space-y-2">
+                    <h4 className="text-white font-medium text-sm">Primary Rules</h4>
+                    <p className="text-white/70 text-sm leading-relaxed">
+                      {selectedRulesMarket.rules_primary}
+                    </p>
+                  </div>
+                )}
+
+                {selectedRulesMarket.rules_secondary && selectedRulesMarket.rules_secondary.length > 0 && (
+                  <div className="space-y-2">
+                    <h4 className="text-white font-medium text-sm">Secondary Rules</h4>
+                    <ul className="space-y-2">
+                      {selectedRulesMarket.rules_secondary.map((rule, idx) => (
+                        <li key={idx} className="text-white/70 text-sm leading-relaxed pl-4 border-l-2 border-yellow-400/30">
+                          {rule}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                {!selectedRulesMarket.rules_primary &&
+                  (!selectedRulesMarket.rules_secondary || selectedRulesMarket.rules_secondary.length === 0) && (
+                    <p className="text-white/40 text-sm text-center py-4">
+                      No rules available for this market.
+                    </p>
+                  )}
+              </div>
+            )}
+            {metadata && metadata.settlement_sources && metadata.settlement_sources.length > 0 && (
+              <div className="space-y-2">
+                <span className="text-white/50 text-sm">Settlement Sources:</span>
+                <div className="flex flex-wrap gap-2">
+                  {metadata.settlement_sources.map((source, idx) => (
+                    <a
+                      key={idx}
+                      href={source.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 py-1 text-yellow-400 text-xs"
+                    >
+                      {source.name}
+                      <ExternalLink className="w-3 h-3" />
+                    </a>
+                  ))}
+                </div>
+              </div>
+            )}
+          </motion.div>
+        )}
+
+        {/* Timeline Section */}
+        {markets.length > 0 && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.4 }}
+            className="space-y-4 border-b pb-4 border-white/20"
+          >
+            <div className="flex justify-between gap-2">
+              <h3 className="text-yellow-400 font-semibold text-lg">Market Timeline</h3>
+
+              {/* Market Selector for Timeline */}
+              <Popover open={timelineOpen} onOpenChange={setTimelineOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    role="combobox"
+                    aria-expanded={timelineOpen}
+                    className="w-40 justify-between text-white bg-transparent outline-none border-none"
+                  >
+                    {selectedTimelineMarket ? (
+                      <span className="truncate">
+                        {selectedTimelineMarket.custom_strike
+                          ? String(Object.values(selectedTimelineMarket.custom_strike)[0])
+                          : selectedTimelineMarket.subtitle || selectedTimelineMarket.title}
+                      </span>
+                    ) : (
+                      'Select market...'
+                    )}
+                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-40 p-0 bg-zinc-900 border-zinc-700">
+                  <Command className="bg-zinc-900">
+                    <CommandInput placeholder="Search markets..." className="text-white" />
+                    <CommandList>
+                      <CommandEmpty>No market found.</CommandEmpty>
+                      <CommandGroup>
+                        {markets.map((market) => {
+                          const label = market.custom_strike
+                            ? Object.values(market.custom_strike)[0]
+                            : market.subtitle || market.title;
+
+                          return (
+                            <CommandItem
+                              key={market.ticker}
+                              value={String(label)}
+                              onSelect={() => {
+                                setSelectedTimelineMarket(market);
+                                setTimelineOpen(false);
+                              }}
+                              className="text-white hover:bg-zinc-800"
+                            >
+                              <span className={cn(
+                                ' text-lg',
+                                selectedTimelineMarket?.ticker === market.ticker
+                                  ? 'opacity-100'
+                                  : 'opacity-0'
+                              )}>•</span>
+                              <span className="truncate">{String(label)}</span>
+                            </CommandItem>
+                          );
+                        })}
+                      </CommandGroup>
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
+            </div>
+
+            {/* Timeline Display */}
+            {selectedTimelineMarket && (
+              <div className="relative pl-6">
+                {/* Vertical Line */}
+                <div className="absolute left-0 top-2 bottom-2 w-px bg-white/20"></div>
+
+                {/* Timeline Items */}
+                <div className="space-y-6">
+                  {/* Open Time */}
+                  <div className="relative flex items-start gap-4">
+                    <div className="absolute -left-7.5 w-3 h-3 rounded-full bg-green-500 border-2 border-zinc-950"></div>
+                    <div>
+                      <div className="text-white/50 text-xs uppercase tracking-wide mb-1">Open Time</div>
+                      <div className="text-green-400 text-sm">
+                        {new Date(selectedTimelineMarket.open_time).toLocaleString('en-US', {
+                          dateStyle: 'medium',
+                          timeStyle: 'short'
+                        })}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Expected Expiration */}
+                  {selectedTimelineMarket.expected_expiration_time && (
+                    <div className="relative flex items-start gap-4">
+                      <div className="absolute -left-7.5 w-3 h-3 rounded-full bg-blue-500 border-2 border-zinc-950"></div>
+                      <div>
+                        <div className="text-white/50 text-xs uppercase tracking-wide mb-1">Expected Expiration</div>
+                        <div className="text-blue-400 text-sm">
+                          {new Date(selectedTimelineMarket.expected_expiration_time).toLocaleString('en-US', {
+                            dateStyle: 'medium',
+                            timeStyle: 'short'
+                          })}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Close Time */}
+                  <div className="relative flex items-start gap-4">
+                    <div className="absolute -left-7.5 w-3 h-3 rounded-full bg-red-500 border-2 border-zinc-950"></div>
+                    <div>
+                      <div className="text-white/50 text-xs uppercase tracking-wide mb-1">Close Time</div>
+                      <div className="text-red-400 text-sm">
+                        {new Date(selectedTimelineMarket.close_time).toLocaleString('en-US', {
+                          dateStyle: 'medium',
+                          timeStyle: 'short'
+                        })}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Early Close Warning */}
+                  {selectedTimelineMarket.can_close_early && (
+                    <div className="relative flex items-start gap-4">
+                      <div>
+                        <div className="text-yellow-400 text-xs uppercase tracking-wide mb-1">⚠️ Can Close Early</div>
+                        {selectedTimelineMarket.early_close_condition && (
+                          <div className="text-white/60 text-sm leading-relaxed max-w-xl">
+                            {selectedTimelineMarket.early_close_condition}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </motion.div>
+        )}
+
+        {/* Activity Section */}
+        {markets.length > 0 && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.45 }}
+            className="space-y-4"
+          >
+            <h3 className="text-yellow-400 font-semibold text-lg">Recent Activity</h3>
+
+            {tradesLoading ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="w-5 h-5 text-yellow-400 animate-spin" />
+              </div>
+            ) : recentTrades.length === 0 ? (
+              <p className="text-white/40 text-sm text-center py-8">
+                No recent trades available.
+              </p>
+            ) : (
+              <div className="space-y-3">
+                {recentTrades.map((trade) => {
+                  const market = markets.find(m => m.ticker === trade.ticker);
+                  const marketLabel = market?.custom_strike
+                    ? Object.values(market.custom_strike)[0]
+                    : market?.subtitle || market?.title || trade.ticker;
+                  
+                  return (
+                    <div
+                      key={trade.trade_id}
+                      className="flex items-center justify-between py-2 border-b border-white/5 hover:border-white/10 transition-colors"
+                    >
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span
+                            className={`text-xs font-semibold uppercase px-2 py-0.5 rounded ${
+                              trade.taker_side === 'yes'
+                                ? 'bg-green-500/20 text-green-400'
+                                : 'bg-red-500/20 text-red-400'
+                            }`}
+                          >
+                            {trade.taker_side}
+                          </span>
+                          <span className="text-white/70 text-xs truncate">
+                            {String(marketLabel)}
+                          </span>
+                        </div>
+                        <div className="text-white/40 text-xs">
+                          {new Date(trade.created_time).toLocaleString('en-US', {
+                            month: 'short',
+                            day: 'numeric',
+                            hour: 'numeric',
+                            minute: '2-digit'
+                          })}
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <div className="text-white font-medium text-sm">
+                          {trade.count} @ {trade.price}¢
+                        </div>
+                        <div className="text-white/50 text-xs">
+                          ${(trade.count * trade.price / 100).toFixed(2)}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </motion.div>
         )}
       </div>
     </div>

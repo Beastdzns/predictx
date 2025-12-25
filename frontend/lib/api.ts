@@ -171,4 +171,36 @@ export class KalshiAPI {
     if (!response.ok) throw new Error('Failed to fetch orderbook');
     return response.json();
   }
+
+  // Fetch market trades
+  static async getTrades(params: {
+    limit?: number;
+    ticker?: string;
+    min_ts?: number;
+    max_ts?: number;
+    cursor?: string;
+  }) {
+    const searchParams = new URLSearchParams();
+    if (params.limit !== undefined) {
+      searchParams.append('limit', params.limit.toString());
+    }
+    if (params.ticker) {
+      searchParams.append('ticker', params.ticker);
+    }
+    if (params.min_ts !== undefined) {
+      searchParams.append('min_ts', params.min_ts.toString());
+    }
+    if (params.max_ts !== undefined) {
+      searchParams.append('max_ts', params.max_ts.toString());
+    }
+    if (params.cursor) {
+      searchParams.append('cursor', params.cursor);
+    }
+    
+    const response = await fetch(`${BASE_URL}/markets/trades?${searchParams.toString()}`, {
+      cache: "no-store",
+    });
+    if (!response.ok) throw new Error('Failed to fetch trades');
+    return response.json();
+  }
 }

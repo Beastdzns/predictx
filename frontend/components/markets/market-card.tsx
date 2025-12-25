@@ -8,6 +8,7 @@ import { KalshiAPI } from '@/lib/api';
 import SingleMarketChart from './single-market-chart';
 import OrderbookYes from './orderbook-yes';
 import OrderbookNo from './orderbook-no';
+import MarketDetailDialog from './market-detail-dialog';
 
 interface MarketCardProps {
     market: Market;
@@ -20,7 +21,9 @@ export default function MarketCard({ market, index, metadata }: MarketCardProps)
     const [viewMode, setViewMode] = useState<'chart' | 'yes' | 'no'>('chart');
     const [orderbook, setOrderbook] = useState<OrderbookResponse | null>(null);
     const [loadingOrderbook, setLoadingOrderbook] = useState(false);
-    
+    const [dialogOpen, setDialogOpen] = useState(false);
+    const [selectedSide, setSelectedSide] = useState<'yes' | 'no'>('yes');
+
     // Calculate price percentage
     const yesPrice = market.last_price || market.yes_bid || 50;
     const noPrice = 100 - yesPrice;
@@ -67,6 +70,7 @@ export default function MarketCard({ market, index, metadata }: MarketCardProps)
     );
 
     return (
+        <>
         <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -77,7 +81,7 @@ export default function MarketCard({ market, index, metadata }: MarketCardProps)
             }}
             className="group relative bg-zinc-900 rounded-xl border border-zinc-800 hover:border-yellow-400/30 transition-all overflow-hidden"
         >
-            <div 
+            <div
                 onClick={() => !isExpanded && setIsExpanded(true)}
                 className={isExpanded ? "p-4" : "p-4 cursor-pointer"}
             >
@@ -122,34 +126,29 @@ export default function MarketCard({ market, index, metadata }: MarketCardProps)
                         </div>
                     )}
 
-                    {/* Subtitle when expanded */}
-                    <AnimatePresence>
-                        {isExpanded && market.subtitle && (
-                            <motion.p
-                                initial={{ height: 0, opacity: 0 }}
-                                animate={{ height: 'auto', opacity: 1 }}
-                                exit={{ height: 0, opacity: 0 }}
-                                className="text-white/50 text-sm overflow-hidden"
-                            >
-                                {market.subtitle}
-                            </motion.p>
-                        )}
-                    </AnimatePresence>
-
                     {/* YES/NO Buttons - Expandable */}
                     <div className="grid grid-cols-2 gap-3">
                         {/* YES Section */}
-                        <motion.div 
-                            animate={{ 
-                                paddingTop: isExpanded ? '12px' : '12px',
-                                paddingBottom: isExpanded ? '12px' : '12px'
+                        <motion.div
+                            animate={{
+                                paddingTop: isExpanded ? '12px' : '8px',
+                                paddingBottom: isExpanded ? '12px' : '8px'
                             }}
-                            className="bg-green-500/10 border border-green-500/30 rounded-lg px-3"
+                            transition={{ duration: 0.3, ease: 'easeInOut' }}
+                            className={`bg-green-500/10 border border-green-500/30 rounded-lg px-3 transition-colors ${
+                                isExpanded ? 'cursor-pointer hover:bg-green-500/15' : ''
+                            }`}
+                            onClick={(e) => {
+                                if (!isExpanded) return;
+                                e.stopPropagation();
+                                setSelectedSide('yes');
+                                setDialogOpen(true);
+                            }}
                         >
-                            <div className="text-center">
-                                <div className="text-green-400 text-xs font-semibold uppercase mb-1">YES</div>
-                                <div className="text-white text-2xl font-bold mb-1">{yesPrice}%</div>
-                                
+                            <div className={isExpanded ? "text-center" : "flex items-center justify-between gap-2"}>
+                                <div className="text-green-400 text-xs font-semibold uppercase">YES</div>
+                                <div className={`text-white font-bold ${isExpanded ? 'text-2xl mb-1' : 'text-lg'}`}>{yesPrice}%</div>
+
                                 <AnimatePresence>
                                     {isExpanded && (
                                         <motion.div
@@ -160,13 +159,13 @@ export default function MarketCard({ market, index, metadata }: MarketCardProps)
                                             className="overflow-hidden space-y-2 pt-2 border-t border-green-500/20"
                                         >
                                             <div className="text-white/40 text-xs">{yesPrice}¢ per share</div>
-                                            
+
                                             {market.yes_sub_title && (
                                                 <div className="px-2 py-1 rounded bg-zinc-950 border border-green-500/40">
                                                     <p className="text-green-400/90 text-xs leading-tight">{market.yes_sub_title}</p>
                                                 </div>
                                             )}
-                                            
+
                                             {market.yes_bid !== undefined && market.yes_ask !== undefined && (
                                                 <div className="space-y-1">
                                                     <div className="text-green-400/60 text-[10px] uppercase">Bid/Ask</div>
@@ -184,17 +183,26 @@ export default function MarketCard({ market, index, metadata }: MarketCardProps)
                         </motion.div>
 
                         {/* NO Section */}
-                        <motion.div 
-                            animate={{ 
-                                paddingTop: isExpanded ? '12px' : '12px',
-                                paddingBottom: isExpanded ? '12px' : '12px'
+                        <motion.div
+                            animate={{
+                                paddingTop: isExpanded ? '12px' : '8px',
+                                paddingBottom: isExpanded ? '12px' : '8px'
                             }}
-                            className="bg-red-500/10 border border-red-500/30 rounded-lg px-3"
+                            transition={{ duration: 0.3, ease: 'easeInOut' }}
+                            className={`bg-red-500/10 border border-red-500/30 rounded-lg px-3 transition-colors ${
+                                isExpanded ? 'cursor-pointer hover:bg-red-500/15' : ''
+                            }`}
+                            onClick={(e) => {
+                                if (!isExpanded) return;
+                                e.stopPropagation();
+                                setSelectedSide('no');
+                                setDialogOpen(true);
+                            }}
                         >
-                            <div className="text-center">
-                                <div className="text-red-400 text-xs font-semibold uppercase mb-1">NO</div>
-                                <div className="text-white text-2xl font-bold mb-1">{noPrice}%</div>
-                                
+                            <div className={isExpanded ? "text-center" : "flex items-center justify-between gap-2"}>
+                                <div className="text-red-400 text-xs font-semibold uppercase">NO</div>
+                                <div className={`text-white font-bold ${isExpanded ? 'text-2xl mb-1' : 'text-lg'}`}>{noPrice}%</div>
+
                                 <AnimatePresence>
                                     {isExpanded && (
                                         <motion.div
@@ -205,13 +213,13 @@ export default function MarketCard({ market, index, metadata }: MarketCardProps)
                                             className="overflow-hidden space-y-2 pt-2 border-t border-red-500/20"
                                         >
                                             <div className="text-white/40 text-xs">{noPrice}¢ per share</div>
-                                            
+
                                             {market.no_sub_title && (
                                                 <div className="px-2 py-1 rounded bg-zinc-950 border border-red-500/40">
                                                     <p className="text-red-400/90 text-xs leading-tight">{market.no_sub_title}</p>
                                                 </div>
                                             )}
-                                            
+
                                             {market.no_bid !== undefined && market.no_ask !== undefined && (
                                                 <div className="space-y-1">
                                                     <div className="text-red-400/60 text-[10px] uppercase">Bid/Ask</div>
@@ -246,11 +254,10 @@ export default function MarketCard({ market, index, metadata }: MarketCardProps)
                                             e.stopPropagation();
                                             setViewMode('chart');
                                         }}
-                                        className={`flex-1 py-1.5 text-xs font-medium rounded-md transition-all ${
-                                            viewMode === 'chart'
+                                        className={`flex-1 py-1.5 text-xs font-medium rounded-md transition-all ${viewMode === 'chart'
                                                 ? 'bg-yellow-400 text-black'
                                                 : 'text-white/60 hover:text-white'
-                                        }`}
+                                            }`}
                                     >
                                         Probability
                                     </button>
@@ -259,11 +266,10 @@ export default function MarketCard({ market, index, metadata }: MarketCardProps)
                                             e.stopPropagation();
                                             setViewMode('yes');
                                         }}
-                                        className={`flex-1 py-1.5 text-xs font-medium rounded-md transition-all ${
-                                            viewMode === 'yes'
+                                        className={`flex-1 py-1.5 text-xs font-medium rounded-md transition-all ${viewMode === 'yes'
                                                 ? 'bg-green-400 text-black'
                                                 : 'text-white/60 hover:text-white'
-                                        }`}
+                                            }`}
                                     >
                                         YES Book
                                     </button>
@@ -272,11 +278,10 @@ export default function MarketCard({ market, index, metadata }: MarketCardProps)
                                             e.stopPropagation();
                                             setViewMode('no');
                                         }}
-                                        className={`flex-1 py-1.5 text-xs font-medium rounded-md transition-all ${
-                                            viewMode === 'no'
+                                        className={`flex-1 py-1.5 text-xs font-medium rounded-md transition-all ${viewMode === 'no'
                                                 ? 'bg-red-400 text-black'
                                                 : 'text-white/60 hover:text-white'
-                                        }`}
+                                            }`}
                                     >
                                         NO Book
                                     </button>
@@ -295,7 +300,7 @@ export default function MarketCard({ market, index, metadata }: MarketCardProps)
                                                     <div className="w-5 h-5 border-2 border-green-400 border-t-transparent rounded-full animate-spin" />
                                                 </div>
                                             ) : orderbook?.orderbook?.yes ? (
-                                                <OrderbookYes 
+                                                <OrderbookYes
                                                     yesOrders={orderbook.orderbook.yes}
                                                     noOrders={orderbook.orderbook.no}
                                                     lastPrice={yesPrice}
@@ -313,7 +318,7 @@ export default function MarketCard({ market, index, metadata }: MarketCardProps)
                                                     <div className="w-5 h-5 border-2 border-red-400 border-t-transparent rounded-full animate-spin" />
                                                 </div>
                                             ) : orderbook?.orderbook?.no ? (
-                                                <OrderbookNo 
+                                                <OrderbookNo
                                                     noOrders={orderbook.orderbook.no}
                                                     yesOrders={orderbook.orderbook.yes}
                                                     lastPrice={noPrice}
@@ -324,6 +329,19 @@ export default function MarketCard({ market, index, metadata }: MarketCardProps)
                                         </div>
                                     )}
                                 </div>
+                                {/* Subtitle */}
+                                <AnimatePresence>
+                                    {isExpanded && market.subtitle && (
+                                        <motion.p
+                                            initial={{ height: 0, opacity: 0 }}
+                                            animate={{ height: 'auto', opacity: 1 }}
+                                            exit={{ height: 0, opacity: 0 }}
+                                            className="text-white/50 text-sm overflow-hidden"
+                                        >
+                                            {market.subtitle}
+                                        </motion.p>
+                                    )}
+                                </AnimatePresence>
 
                                 <div className="grid grid-cols-3 gap-2">
                                     <div className="flex flex-col items-center gap-1 py-2 px-2 bg-zinc-800/50 rounded-lg">
@@ -357,5 +375,15 @@ export default function MarketCard({ market, index, metadata }: MarketCardProps)
                 </div>
             </div>
         </motion.div>
+
+        {/* Market Detail Dialog */}
+        <MarketDetailDialog
+            market={market}
+            metadata={metadata || null}
+            open={dialogOpen}
+            onOpenChange={setDialogOpen}
+            initialSide={selectedSide}
+        />
+        </>
     );
 }

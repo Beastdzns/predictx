@@ -27,6 +27,12 @@ export interface Market {
   floor_strike?: number;
   cap_strike?: number;
   custom_strike?: any;
+  rules_primary?: string;
+  rules_secondary?: string[];
+  can_close_early?: boolean;
+  early_close_condition?: string;
+  expected_expiration_time?: string;
+  latest_expiration_time?: string;
 }
 
 export interface Series {
@@ -130,4 +136,22 @@ export interface Orderbook {
 
 export interface OrderbookResponse {
   orderbook: Orderbook;
+}
+
+export interface Trade {
+  trade_id: string;
+  ticker: string;
+  price: number;
+  count: number;
+  yes_price: number;
+  no_price: number;
+  yes_price_dollars: string;
+  no_price_dollars: string;
+  taker_side: 'yes' | 'no';
+  created_time: string;
+}
+
+export interface TradesResponse {
+  trades: Trade[];
+  cursor?: string;
 }

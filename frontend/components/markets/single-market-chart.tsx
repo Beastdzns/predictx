@@ -12,6 +12,21 @@ interface SingleMarketChartProps {
   market: Market;
 }
 
+// Custom blinking dot component
+const BlinkingDot = (props: any) => {
+  const { cx, cy } = props;
+  return (
+    <circle cx={cx} cy={cy} r={4} fill="#FACC15">
+      <animate
+        attributeName="opacity"
+        values="1;0.2;1"
+        dur="1s"
+        repeatCount="indefinite"
+      />
+    </circle>
+  );
+};
+
 export default function SingleMarketChart({ market }: SingleMarketChartProps) {
   const { chartInterval } = useChartStore();
   const [chartData, setChartData] = useState<any[]>([]);
@@ -101,7 +116,14 @@ export default function SingleMarketChart({ market }: SingleMarketChartProps) {
           dataKey="price"
           stroke="#FACC15"
           strokeWidth={2}
-          dot={false}
+          dot={(props: any) => {
+            // Only show blinking dot at the last point
+            const isLastPoint = props.index === chartData.length - 1;
+            if (isLastPoint && props.payload.price) {
+              return <BlinkingDot {...props} />;
+            }
+            return null;
+          }}
           activeDot={{ r: 3, fill: '#FACC15' }}
           connectNulls
         />

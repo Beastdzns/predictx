@@ -1,7 +1,7 @@
 'use client';
 
 import { Market, MarketCandlesticks, EventMetadata } from '@/lib/types';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, Dot } from 'recharts';
 import { motion } from 'framer-motion';
 import { useEffect, useState } from 'react';
 import { KalshiAPI } from '@/lib/api';
@@ -19,6 +19,21 @@ const intervalOptions = [
   { label: '1d', value: 1440 },
   { label: '1w', value: 10080 },
 ];
+
+// Custom blinking dot component
+const BlinkingDot = (props: any) => {
+  const { cx, cy, fill } = props;
+  return (
+    <circle cx={cx} cy={cy} r={5} fill={fill}>
+      <animate
+        attributeName="opacity"
+        values="1;0.2;1"
+        dur="1s"
+        repeatCount="indefinite"
+      />
+    </circle>
+  );
+};
 
 export default function MarketCharts({ markets, metadata }: MarketChartsProps) {
   const { chartInterval, setChartInterval } = useChartStore();
@@ -134,7 +149,7 @@ export default function MarketCharts({ markets, metadata }: MarketChartsProps) {
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: 0.25 }}
-      className="space-y-4 -mx-6"
+      className="space-y-4 -mx-5"
     >
       {/* Interval Toggle */}
       <div className="flex items-center justify-between px-6">
@@ -225,7 +240,14 @@ export default function MarketCharts({ markets, metadata }: MarketChartsProps) {
                   name={market.ticker}
                   stroke={color}
                   strokeWidth={2}
-                  dot={false}
+                  dot={(props: any) => {
+                    // Only show blinking dot at the last point
+                    const isLastPoint = props.index === data.length - 1;
+                    if (isLastPoint && props.payload[market.ticker]) {
+                      return <BlinkingDot {...props} fill={color} />;
+                    }
+                    return null;
+                  }}
                   activeDot={{ r: 4, fill: color }}
                   connectNulls
                 />

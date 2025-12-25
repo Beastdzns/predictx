@@ -12,7 +12,7 @@ function LayoutWrapper({ children }: { children: React.ReactNode }) {
   return (
     <div suppressHydrationWarning>
       {!isEventPage && <Appbar />}
-      <main className={`pb-24 scrollbar-hide ${!isEventPage ? 'pt-32' : ''}`}>
+      <main className={`pb-24 scrollbar-hide ${!isEventPage ? 'pt-30' : ''}`}>
         {children}
       </main>
       <Bottombar />

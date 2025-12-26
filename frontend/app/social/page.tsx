@@ -2,10 +2,12 @@
 
 import { useState, useEffect, useCallback, memo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { MessageSquare, ArrowBigUp, ArrowBigDown, Send, Image as ImageIcon, X } from 'lucide-react';
+import { MessageSquare, ArrowBigUp, ArrowBigDown, Send, Image as ImageIcon, X, Lock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { useReplyDialogStore } from '@/lib/store-reply-dialog';
+import { useAccessControlStore } from '@/lib/store-access';
+import ProtectedContent from '@/components/protected-content';
 
 interface Reply {
   _id: string;
@@ -33,13 +35,15 @@ const ReplyItem = memo(({
   postId, 
   depth = 0,
   formatTime,
-  onRefresh
+  onRefresh,
+  keyPath = ''
 }: { 
   reply: Reply; 
   postId: string; 
   depth?: number;
   formatTime: (date: string) => string;
   onRefresh: () => void;
+  keyPath?: string;
 }) => {
   const openReplyDialog = useReplyDialogStore((state) => state.open);
 
@@ -66,21 +70,49 @@ const ReplyItem = memo(({
         </button>
       </div>
 
-      {reply.replies && reply.replies.map((r, idx) => (
-        <ReplyItem 
-          key={r._id || `${reply._id}-${idx}`} 
-          reply={r} 
-          postId={postId} 
-          depth={depth + 1}
-          formatTime={formatTime}
-          onRefresh={onRefresh}
-        />
-      ))}
+      {reply.replies && reply.replies.map((r, idx) => {
+        const childKeyPath = keyPath ? `${keyPath}-${idx}` : `${reply._id}-${idx}`;
+        return (
+          <ReplyItem 
+            key={r._id || childKeyPath} 
+            reply={r} 
+            postId={postId} 
+            depth={depth + 1}
+            formatTime={formatTime}
+            onRefresh={onRefresh}
+            keyPath={childKeyPath}
+          />
+        );
+      })}
     </motion.div>
   );
 });
 
 ReplyItem.displayName = 'ReplyItem';
+
+// Unlock Feed Button Component
+function UnlockFeedButton() {
+  const hasSocialViewAccess = useAccessControlStore((state) => state.hasSocialViewAccess);
+  const requestSocialViewAccess = useAccessControlStore((state) => state.requestSocialViewAccess);
+
+  if (hasSocialViewAccess) return null;
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: -10 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="mb-6"
+    >
+      <button
+        onClick={requestSocialViewAccess}
+        className="w-full bg-linear-to-r from-yellow-400 to-yellow-500 hover:from-yellow-500 hover:to-yellow-600 text-black font-bold py-4 px-6 rounded-lg flex items-center justify-center gap-3 transition-all transform hover:scale-[1.02] shadow-lg"
+      >
+        <Lock className="w-5 h-5" />
+        Unlock Community Feed
+      </button>
+    </motion.div>
+  );
+}
 
 export default function SocialPage() {
   const [username, setUsername] = useState<string>('');
@@ -135,6 +167,10 @@ export default function SocialPage() {
 
   const createPost = async () => {
     if (!newPostContent.trim()) return;
+    
+    // Check access before posting
+    const hasAccess = useAccessControlStore.getState().requestSocialPostAccess();
+    if (!hasAccess) return;
 
     try {
       const response = await fetch('/api/posts', {
@@ -285,6 +321,9 @@ export default function SocialPage() {
         </div>
       </motion.div>
 
+      {/* Unlock Feed Button */}
+      <UnlockFeedButton />
+
       {/* Sort Filter */}
       <div className="flex items-center gap-3 mb-4">
         <span className="text-white/60 text-sm">Sort by:</span>
@@ -311,13 +350,20 @@ export default function SocialPage() {
       </div>
 
       {/* Posts */}
-      <div className="space-y-4">
-        {loading ? (
-          <div className="text-center text-white/40 py-12">Loading posts...</div>
-        ) : posts.length === 0 ? (
-          <div className="text-center text-white/40 py-12">No posts yet. Be the first to post!</div>
-        ) : (
-          sortedPosts().map((post, idx) => (
+      <ProtectedContent
+        isUnlocked={useAccessControlStore.getState().hasSocialViewAccess}
+        onUnlock={() => useAccessControlStore.getState().requestSocialViewAccess()}
+        blurAmount="blur-lg"
+        message="Unlock Feed"
+        title="Community Posts"
+      >
+        <div className="space-y-4">
+          {loading ? (
+            <div className="text-center text-white/40 py-12">Loading posts...</div>
+          ) : posts.length === 0 ? (
+            <div className="text-center text-white/40 py-12">No posts yet. Be the first to post!</div>
+          ) : (
+            sortedPosts().map((post, idx) => (
             <motion.div
               key={post._id}
               initial={{ opacity: 0, y: 20 }}
@@ -372,9 +418,10 @@ export default function SocialPage() {
                 </div>
               </div>
             </motion.div>
-          ))
-        )}
-      </div>
+            ))
+          )}
+        </div>
+      </ProtectedContent>
 
       {/* Post Detail Dialog */}
       <Dialog open={!!selectedPost} onOpenChange={() => setSelectedPost(null)}>
@@ -488,19 +535,23 @@ export default function SocialPage() {
                 {selectedPost.replies.length > 0 && (
                   <div className="pt-4 space-y-2 border-t border-white/10">
                     <h3 className="text-white/60 text-sm font-semibold mb-3">Replies</h3>
-                    {selectedPost.replies.map((reply, idx) => (
-                      <ReplyItem 
-                        key={reply._id || `${selectedPost._id}-reply-${idx}`} 
-                        reply={reply} 
-                        postId={selectedPost._id}
-                        formatTime={formatTime}
-                        onRefresh={async () => {
-                          await fetchPosts();
-                          const updatedPosts = await fetch('/api/posts').then(r => r.json());
-                          setSelectedPost(updatedPosts.find((p: Post) => p._id === selectedPost._id));
-                        }}
-                      />
-                    ))}
+                    {selectedPost.replies.map((reply, idx) => {
+                      const keyPath = `${selectedPost._id}-${idx}`;
+                      return (
+                        <ReplyItem 
+                          key={reply._id || keyPath} 
+                          reply={reply} 
+                          postId={selectedPost._id}
+                          formatTime={formatTime}
+                          keyPath={keyPath}
+                          onRefresh={async () => {
+                            await fetchPosts();
+                            const updatedPosts = await fetch('/api/posts').then(r => r.json());
+                            setSelectedPost(updatedPosts.find((p: Post) => p._id === selectedPost._id));
+                          }}
+                        />
+                      );
+                    })}
                   </div>
                 )}
               </div>
@@ -530,6 +581,10 @@ function ReplyDialog({ username, onRefresh }: { username: string; onRefresh: () 
 
   const handleSubmit = async () => {
     if (!replyContent.trim() || !postId) return;
+
+    // Check access before replying
+    const hasAccess = useAccessControlStore.getState().requestSocialCommentAccess();
+    if (!hasAccess) return;
 
     setSubmitting(true);
     try {

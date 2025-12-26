@@ -10,6 +10,8 @@ import OrderbookYes from './orderbook-yes';
 import OrderbookNo from './orderbook-no';
 import { Loader2, ExternalLink } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useAccessControlStore } from '@/lib/store-access';
+import ProtectedContent from '@/components/protected-content';
 
 interface MarketDetailDialogProps {
   market: Market | null;
@@ -32,6 +34,17 @@ export default function MarketDetailDialog({
   const [orderbookLoading, setOrderbookLoading] = useState(false);
   const [recentTrades, setRecentTrades] = useState<Trade[]>([]);
   const [tradesLoading, setTradesLoading] = useState(false);
+
+  // Access control - market-specific
+  const marketTicker = market?.ticker || '';
+  const hasTradeCalculatorAccess = useAccessControlStore((state) => state.hasTradeCalculatorAccess(marketTicker));
+  const hasOrderbookAccess = useAccessControlStore((state) => state.hasOrderbookAccess(marketTicker));
+  const hasChartAccess = useAccessControlStore((state) => state.hasChartAccess(marketTicker));
+  const hasActivityAccess = useAccessControlStore((state) => state.hasActivityAccess(marketTicker));
+  const requestTradeCalculatorAccess = () => useAccessControlStore.getState().requestTradeCalculatorAccess(marketTicker);
+  const requestOrderbookAccess = () => useAccessControlStore.getState().requestOrderbookAccess(marketTicker);
+  const requestChartAccess = () => useAccessControlStore.getState().requestChartAccess(marketTicker);
+  const requestActivityAccess = () => useAccessControlStore.getState().requestActivityAccess(marketTicker);
 
   useEffect(() => {
     setSelectedSide(initialSide);
@@ -139,11 +152,19 @@ export default function MarketDetailDialog({
           </div>
 
           {/* Trade Info Box */}
-          <TradeInfoBox
-            side={selectedSide}
-            price={selectedSide === 'yes' ? yesPrice : noPrice}
-            marketTitle={market.title}
-          />
+          <ProtectedContent
+            isUnlocked={hasTradeCalculatorAccess}
+            onUnlock={() => requestTradeCalculatorAccess()}
+            blurAmount="blur-md"
+            message="Unlock Calculator"
+            title="Trade Calculator"
+          >
+            <TradeInfoBox
+              side={selectedSide}
+              price={selectedSide === 'yes' ? yesPrice : noPrice}
+              marketTitle={market.title}
+            />
+          </ProtectedContent>
 
           {/* Chart/Orderbook Toggle */}
           <div className="flex gap-2 border-b border-white/10">
@@ -179,7 +200,15 @@ export default function MarketDetailDialog({
                 exit={{ opacity: 0, y: -10 }}
                 transition={{ duration: 0.2 }}
               >
-                <SingleMarketChart market={market} />
+                <ProtectedContent
+                  isUnlocked={hasChartAccess}
+                  onUnlock={() => requestChartAccess()}
+                  blurAmount="blur-md"
+                  message="Unlock Chart"
+                  title="Price Chart"
+                >
+                  <SingleMarketChart market={market} />
+                </ProtectedContent>
               </motion.div>
             ) : (
               <motion.div
@@ -189,24 +218,32 @@ export default function MarketDetailDialog({
                 exit={{ opacity: 0, y: -10 }}
                 transition={{ duration: 0.2 }}
               >
-                {orderbookLoading ? (
-                  <div className="flex items-center justify-center py-12">
-                    <Loader2 className="w-6 h-6 text-yellow-400 animate-spin" />
-                  </div>
-                ) : orderbook ? (
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <h4 className="text-green-400 text-sm font-semibold mb-2">YES Orderbook</h4>
-                      <OrderbookYes yesOrders={orderbook.yes} noOrders={orderbook.no} />
+                <ProtectedContent
+                  isUnlocked={hasOrderbookAccess}
+                  onUnlock={() => requestOrderbookAccess()}
+                  blurAmount="blur-md"
+                  message="Unlock Orderbook"
+                  title="Order Book"
+                >
+                  {orderbookLoading ? (
+                    <div className="flex items-center justify-center py-12">
+                      <Loader2 className="w-6 h-6 text-yellow-400 animate-spin" />
                     </div>
-                    <div>
-                      <h4 className="text-red-400 text-sm font-semibold mb-2">NO Orderbook</h4>
-                      <OrderbookNo noOrders={orderbook.no} yesOrders={orderbook.yes} />
+                  ) : orderbook ? (
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <h4 className="text-green-400 text-sm font-semibold mb-2">YES Orderbook</h4>
+                        <OrderbookYes yesOrders={orderbook.yes} noOrders={orderbook.no} />
+                      </div>
+                      <div>
+                        <h4 className="text-red-400 text-sm font-semibold mb-2">NO Orderbook</h4>
+                        <OrderbookNo noOrders={orderbook.no} yesOrders={orderbook.yes} />
+                      </div>
                     </div>
-                  </div>
-                ) : (
-                  <p className="text-white/40 text-center py-8">No orderbook data available</p>
-                )}
+                  ) : (
+                    <p className="text-white/40 text-center py-8">No orderbook data available</p>
+                  )}
+                </ProtectedContent>
               </motion.div>
             )}
           </AnimatePresence>
@@ -221,7 +258,7 @@ export default function MarketDetailDialog({
                   <p className="text-white/70 text-sm leading-relaxed">{market.rules_primary}</p>
                 </div>
               )}
-              {market.rules_secondary && market.rules_secondary.length > 0 && (
+              {market.rules_secondary && Array.isArray(market.rules_secondary) && market.rules_secondary.length > 0 && (
                 <div className="space-y-2">
                   <h4 className="text-white text-sm font-medium">Secondary Rules</h4>
                   <ul className="space-y-2">
@@ -241,51 +278,58 @@ export default function MarketDetailDialog({
 
           {/* Recent Activity */}
           <div className="space-y-3 border-t border-white/10 pt-4">
-            <h3 className="text-yellow-400 font-semibold">Recent Activity</h3>
-            {tradesLoading ? (
-              <div className="flex items-center justify-center py-6">
-                <Loader2 className="w-5 h-5 text-yellow-400 animate-spin" />
-              </div>
-            ) : recentTrades.length === 0 ? (
-              <p className="text-white/40 text-sm text-center py-6">No recent trades</p>
-            ) : (
-              <div className="space-y-2 max-h-64 overflow-y-auto">
-                {recentTrades.map((trade) => (
-                  <div
-                    key={trade.trade_id}
-                    className="flex items-center justify-between py-2 border-b border-white/5"
-                  >
-                    <div className="flex items-center gap-2">
-                      <span
-                        className={`text-xs font-semibold uppercase px-2 py-0.5 rounded ${
-                          trade.taker_side === 'yes'
-                            ? 'bg-green-500/20 text-green-400'
-                            : 'bg-red-500/20 text-red-400'
-                        }`}
-                      >
-                        {trade.taker_side}
-                      </span>
-                      <span className="text-white/40 text-xs">
-                        {new Date(trade.created_time).toLocaleString('en-US', {
-                          month: 'short',
-                          day: 'numeric',
-                          hour: 'numeric',
-                          minute: '2-digit',
-                        })}
-                      </span>
-                    </div>
-                    <div className="text-right">
-                      <div className="text-white font-mono text-sm">
-                        {trade.count} @ {trade.price}¢
+            <ProtectedContent
+              isUnlocked={hasActivityAccess}
+              onUnlock={() => requestActivityAccess()}
+              blurAmount="blur-md"
+              message="Unlock Activity"
+              title="Recent Activity"
+            >
+              {tradesLoading ? (
+                <div className="flex items-center justify-center py-6">
+                  <Loader2 className="w-5 h-5 text-yellow-400 animate-spin" />
+                </div>
+              ) : recentTrades.length === 0 ? (
+                <p className="text-white/40 text-sm text-center py-6">No recent trades</p>
+              ) : (
+                <div className="space-y-2 max-h-64 overflow-y-auto">
+                  {recentTrades.map((trade) => (
+                    <div
+                      key={trade.trade_id}
+                      className="flex items-center justify-between py-2 border-b border-white/5"
+                    >
+                      <div className="flex items-center gap-2">
+                        <span
+                          className={`text-xs font-semibold uppercase px-2 py-0.5 rounded ${
+                            trade.taker_side === 'yes'
+                              ? 'bg-green-500/20 text-green-400'
+                              : 'bg-red-500/20 text-red-400'
+                          }`}
+                        >
+                          {trade.taker_side}
+                        </span>
+                        <span className="text-white/40 text-xs">
+                          {new Date(trade.created_time).toLocaleString('en-US', {
+                            month: 'short',
+                            day: 'numeric',
+                            hour: 'numeric',
+                            minute: '2-digit',
+                          })}
+                        </span>
                       </div>
-                      <div className="text-white/50 text-xs">
-                        ${((trade.count * trade.price) / 100).toFixed(2)}
+                      <div className="text-right">
+                        <div className="text-white font-mono text-sm">
+                          {trade.count} @ {trade.price}¢
+                        </div>
+                        <div className="text-white/50 text-xs">
+                          ${((trade.count * trade.price) / 100).toFixed(2)}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))}
-              </div>
-            )}
+                  ))}
+                </div>
+              )}
+            </ProtectedContent>
           </div>
 
           {/* Market Metadata */}

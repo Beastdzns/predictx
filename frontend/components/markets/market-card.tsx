@@ -9,6 +9,8 @@ import SingleMarketChart from './single-market-chart';
 import OrderbookYes from './orderbook-yes';
 import OrderbookNo from './orderbook-no';
 import MarketDetailDialog from './market-detail-dialog';
+import { useAccessControlStore } from '@/lib/store-access';
+import ProtectedContent from '@/components/protected-content';
 
 interface MarketCardProps {
     market: Market;
@@ -23,6 +25,12 @@ export default function MarketCard({ market, index, metadata }: MarketCardProps)
     const [loadingOrderbook, setLoadingOrderbook] = useState(false);
     const [dialogOpen, setDialogOpen] = useState(false);
     const [selectedSide, setSelectedSide] = useState<'yes' | 'no'>('yes');
+
+    // Access control - market-specific
+    const hasChartAccess = useAccessControlStore((state) => state.hasChartAccess(market.ticker));
+    const hasOrderbookAccess = useAccessControlStore((state) => state.hasOrderbookAccess(market.ticker));
+    const requestChartAccess = () => useAccessControlStore.getState().requestChartAccess(market.ticker);
+    const requestOrderbookAccess = () => useAccessControlStore.getState().requestOrderbookAccess(market.ticker);
 
     // Calculate price percentage
     const yesPrice = market.last_price || market.yes_bid || 50;
@@ -290,43 +298,67 @@ export default function MarketCard({ market, index, metadata }: MarketCardProps)
                                 {/* Content Area */}
                                 <div className="min-h-50">
                                     {viewMode === 'chart' && (
-                                        <SingleMarketChart market={market} />
+                                        <ProtectedContent
+                                            isUnlocked={hasChartAccess}
+                                            onUnlock={() => requestChartAccess()}
+                                            blurAmount="blur-md"
+                                            message="Unlock"
+                                            title="Probability Chart"
+                                        >
+                                            <SingleMarketChart market={market} />
+                                        </ProtectedContent>
                                     )}
 
                                     {viewMode === 'yes' && (
-                                        <div>
-                                            {loadingOrderbook ? (
-                                                <div className="flex items-center justify-center py-12">
-                                                    <div className="w-5 h-5 border-2 border-green-400 border-t-transparent rounded-full animate-spin" />
-                                                </div>
-                                            ) : orderbook?.orderbook?.yes ? (
-                                                <OrderbookYes
-                                                    yesOrders={orderbook.orderbook.yes}
-                                                    noOrders={orderbook.orderbook.no}
-                                                    lastPrice={yesPrice}
-                                                />
-                                            ) : (
-                                                <div className="text-center py-12 text-white/40 text-sm">No YES orders</div>
-                                            )}
-                                        </div>
+                                        <ProtectedContent
+                                            isUnlocked={hasOrderbookAccess}
+                                            onUnlock={() => requestOrderbookAccess()}
+                                            blurAmount="blur-md"
+                                            message="Unlock"
+                                            title="YES Order Book"
+                                        >
+                                            <div>
+                                                {loadingOrderbook ? (
+                                                    <div className="flex items-center justify-center py-12">
+                                                        <div className="w-5 h-5 border-2 border-green-400 border-t-transparent rounded-full animate-spin" />
+                                                    </div>
+                                                ) : orderbook?.orderbook?.yes ? (
+                                                    <OrderbookYes
+                                                        yesOrders={orderbook.orderbook.yes}
+                                                        noOrders={orderbook.orderbook.no}
+                                                        lastPrice={yesPrice}
+                                                    />
+                                                ) : (
+                                                    <div className="text-center py-12 text-white/40 text-sm">No YES orders</div>
+                                                )}
+                                            </div>
+                                        </ProtectedContent>
                                     )}
 
                                     {viewMode === 'no' && (
-                                        <div>
-                                            {loadingOrderbook ? (
-                                                <div className="flex items-center justify-center py-12">
-                                                    <div className="w-5 h-5 border-2 border-red-400 border-t-transparent rounded-full animate-spin" />
-                                                </div>
-                                            ) : orderbook?.orderbook?.no ? (
-                                                <OrderbookNo
-                                                    noOrders={orderbook.orderbook.no}
-                                                    yesOrders={orderbook.orderbook.yes}
-                                                    lastPrice={noPrice}
-                                                />
-                                            ) : (
-                                                <div className="text-center py-12 text-white/40 text-sm">No NO orders</div>
-                                            )}
-                                        </div>
+                                        <ProtectedContent
+                                            isUnlocked={hasOrderbookAccess}
+                                            onUnlock={() => requestOrderbookAccess()}
+                                            blurAmount="blur-md"
+                                            message="Unlock"
+                                            title="NO Order Book"
+                                        >
+                                            <div>
+                                                {loadingOrderbook ? (
+                                                    <div className="flex items-center justify-center py-12">
+                                                        <div className="w-5 h-5 border-2 border-red-400 border-t-transparent rounded-full animate-spin" />
+                                                    </div>
+                                                ) : orderbook?.orderbook?.no ? (
+                                                    <OrderbookNo
+                                                        noOrders={orderbook.orderbook.no}
+                                                        yesOrders={orderbook.orderbook.yes}
+                                                        lastPrice={noPrice}
+                                                    />
+                                                ) : (
+                                                    <div className="text-center py-12 text-white/40 text-sm">No NO orders</div>
+                                                )}
+                                            </div>
+                                        </ProtectedContent>
                                     )}
                                 </div>
                                 {/* Subtitle */}

@@ -10,6 +10,8 @@ import MarketCard from '@/components/markets/market-card';
 import MarketCharts from '@/components/markets/market-charts';
 import MarketSentiment from '@/components/markets/market-sentiment';
 import { Button } from '@/components/ui/button';
+import { useAccessControlStore } from '@/lib/store-access';
+import ProtectedContent from '@/components/protected-content';
 import {
   Dialog,
   DialogContent,
@@ -53,6 +55,17 @@ export default function EventPage() {
   const [tradesLoading, setTradesLoading] = useState(false);
   const [sentimentData, setSentimentData] = useState<any>(null);
   const [sentimentLoading, setSentimentLoading] = useState(false);
+
+  // Access control hooks - event-specific using ticker as ID
+  const eventTickerId = ticker as string;
+  const hasChartAccess = useAccessControlStore((state) => state.hasChartAccess(eventTickerId));
+  const hasSentimentAccess = useAccessControlStore((state) => state.hasSentimentAccess(eventTickerId));
+  const hasActivityAccess = useAccessControlStore((state) => state.hasActivityAccess(eventTickerId));
+  const hasMarketAccess = useAccessControlStore((state) => state.hasMarketAccess(eventTickerId));
+  const requestChartAccess = () => useAccessControlStore.getState().requestChartAccess(eventTickerId);
+  const requestSentimentAccess = () => useAccessControlStore.getState().requestSentimentAccess(eventTickerId);
+  const requestActivityAccess = () => useAccessControlStore.getState().requestActivityAccess(eventTickerId);
+  const requestMarketAccess = () => useAccessControlStore.getState().requestMarketAccess(eventTickerId);
 
   useEffect(() => {
     const fetchEvent = async () => {
@@ -215,7 +228,7 @@ export default function EventPage() {
   return (
     <div className="min-h-screen pb-24">
       {/* Header */}
-      <div className="sticky top-0 z-10 bg-black/80 backdrop-blur-sm border-b border-yellow-400/20">
+      <div className="sticky top-0 z-40 bg-black/80 backdrop-blur-sm border-b border-yellow-400/20">
         <div className="px-6 py-4">
           <motion.button
             initial={{ opacity: 0, x: -20 }}
@@ -290,7 +303,15 @@ export default function EventPage() {
           <>
             {/* Market Charts for Top 3 Markets */}
             {markets.length > 0 && (
-              <MarketCharts markets={markets} metadata={metadata} />
+              <ProtectedContent
+                isUnlocked={hasChartAccess}
+                onUnlock={() => requestChartAccess()}
+                blurAmount="blur-md"
+                message="Unlock Charts"
+                title="Market Charts"
+              >
+                <MarketCharts markets={markets} metadata={metadata} />
+              </ProtectedContent>
             )}
 
             {/* Metadata Details */}
@@ -319,12 +340,20 @@ export default function EventPage() {
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.28 }}
             >
-              <MarketSentiment
-                sentiment={sentimentData?.sentiment || 'neutral'}
-                insights={sentimentData?.insights || ''}
-                recommendations={sentimentData?.recommendations || []}
-                loading={sentimentLoading}
-              />
+              <ProtectedContent
+                isUnlocked={hasSentimentAccess}
+                onUnlock={() => requestSentimentAccess()}
+                blurAmount="blur-md"
+                message="Unlock Sentiment"
+                title="Market Sentiment"
+              >
+                <MarketSentiment
+                  sentiment={sentimentData?.sentiment || 'neutral'}
+                  insights={sentimentData?.insights || ''}
+                  recommendations={sentimentData?.recommendations || []}
+                  loading={sentimentLoading}
+                />
+              </ProtectedContent>
             </motion.div>
 
             {/* Beginner Helper Button */}
@@ -475,7 +504,7 @@ export default function EventPage() {
                   </div>
                 )}
 
-                {selectedRulesMarket.rules_secondary && selectedRulesMarket.rules_secondary.length > 0 && (
+                {selectedRulesMarket.rules_secondary && Array.isArray(selectedRulesMarket.rules_secondary) && selectedRulesMarket.rules_secondary.length > 0 && (
                   <div className="space-y-2">
                     <h4 className="text-white font-medium text-sm">Secondary Rules</h4>
                     <ul className="space-y-2">
@@ -489,7 +518,7 @@ export default function EventPage() {
                 )}
 
                 {!selectedRulesMarket.rules_primary &&
-                  (!selectedRulesMarket.rules_secondary || selectedRulesMarket.rules_secondary.length === 0) && (
+                  (!selectedRulesMarket.rules_secondary || !Array.isArray(selectedRulesMarket.rules_secondary) || selectedRulesMarket.rules_secondary.length === 0) && (
                     <p className="text-white/40 text-sm text-center py-4">
                       No rules available for this market.
                     </p>
@@ -667,66 +696,72 @@ export default function EventPage() {
             transition={{ delay: 0.45 }}
             className="space-y-4"
           >
-            <h3 className="text-yellow-400 font-semibold text-lg">Recent Activity</h3>
-
-            {tradesLoading ? (
-              <div className="flex items-center justify-center py-8">
-                <Loader2 className="w-5 h-5 text-yellow-400 animate-spin" />
-              </div>
-            ) : recentTrades.length === 0 ? (
-              <p className="text-white/40 text-sm text-center py-8">
-                No recent trades available.
-              </p>
-            ) : (
-              <div className="space-y-3">
-                {recentTrades.map((trade) => {
-                  const market = markets.find(m => m.ticker === trade.ticker);
-                  const marketLabel = market?.custom_strike
-                    ? Object.values(market.custom_strike)[0]
-                    : market?.subtitle || market?.title || trade.ticker;
-                  
-                  return (
-                    <div
-                      key={trade.trade_id}
-                      className="flex items-center justify-between py-2 border-b border-white/5 hover:border-white/10 transition-colors"
-                    >
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-1">
-                          <span
-                            className={`text-xs font-semibold uppercase px-2 py-0.5 rounded ${
-                              trade.taker_side === 'yes'
-                                ? 'bg-green-500/20 text-green-400'
-                                : 'bg-red-500/20 text-red-400'
-                            }`}
-                          >
-                            {trade.taker_side}
-                          </span>
-                          <span className="text-white/70 text-xs truncate">
-                            {String(marketLabel)}
-                          </span>
+            <ProtectedContent
+              isUnlocked={hasActivityAccess}
+              onUnlock={() => requestActivityAccess()}
+              blurAmount="blur-md"
+              message="Unlock Activity"
+              title="Recent Activity"
+            >
+              {tradesLoading ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="w-5 h-5 text-yellow-400 animate-spin" />
+                </div>
+              ) : recentTrades.length === 0 ? (
+                <p className="text-white/40 text-sm text-center py-8">
+                  No recent trades available.
+                </p>
+              ) : (
+                <div className="space-y-3">
+                  {recentTrades.map((trade) => {
+                    const market = markets.find(m => m.ticker === trade.ticker);
+                    const marketLabel = market?.custom_strike
+                      ? Object.values(market.custom_strike)[0]
+                      : market?.subtitle || market?.title || trade.ticker;
+                    
+                    return (
+                      <div
+                        key={trade.trade_id}
+                        className="flex items-center justify-between py-2 border-b border-white/5 hover:border-white/10 transition-colors"
+                      >
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-1">
+                            <span
+                              className={`text-xs font-semibold uppercase px-2 py-0.5 rounded ${
+                                trade.taker_side === 'yes'
+                                  ? 'bg-green-500/20 text-green-400'
+                                  : 'bg-red-500/20 text-red-400'
+                              }`}
+                            >
+                              {trade.taker_side}
+                            </span>
+                            <span className="text-white/70 text-xs truncate">
+                              {String(marketLabel)}
+                            </span>
+                          </div>
+                          <div className="text-white/40 text-xs">
+                            {new Date(trade.created_time).toLocaleString('en-US', {
+                              month: 'short',
+                              day: 'numeric',
+                              hour: 'numeric',
+                              minute: '2-digit'
+                            })}
+                          </div>
                         </div>
-                        <div className="text-white/40 text-xs">
-                          {new Date(trade.created_time).toLocaleString('en-US', {
-                            month: 'short',
-                            day: 'numeric',
-                            hour: 'numeric',
-                            minute: '2-digit'
-                          })}
+                        <div className="text-right">
+                          <div className="text-white font-medium text-sm">
+                            {trade.count} @ {trade.price}¢
+                          </div>
+                          <div className="text-white/50 text-xs">
+                            ${(trade.count * trade.price / 100).toFixed(2)}
+                          </div>
                         </div>
                       </div>
-                      <div className="text-right">
-                        <div className="text-white font-medium text-sm">
-                          {trade.count} @ {trade.price}¢
-                        </div>
-                        <div className="text-white/50 text-xs">
-                          ${(trade.count * trade.price / 100).toFixed(2)}
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
+                    );
+                  })}
+                </div>
+              )}
+            </ProtectedContent>
           </motion.div>
         )}
       </div>

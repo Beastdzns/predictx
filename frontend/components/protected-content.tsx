@@ -1,6 +1,6 @@
 'use client';
 
-import { ReactNode } from 'react';
+import { ReactNode, useState, useEffect } from 'react';
 import { Lock } from 'lucide-react';
 import { motion } from 'framer-motion';
 
@@ -21,10 +21,19 @@ export default function ProtectedContent({
   message = 'Pay to unlock',
   title,
 }: ProtectedContentProps) {
+  const [isClient, setIsClient] = useState(false);
+
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
+
+  // During SSR and initial hydration, always show locked state
+  const shouldShowLocked = !isClient || !isUnlocked;
+
   return (
     <div className="space-y-3">
       {/* Header with title and unlock button */}
-      {!isUnlocked && title && (
+      {shouldShowLocked && title && (
         <div className="flex items-center justify-between">
           <h3 className="text-yellow-400 font-semibold text-lg">{title}</h3>
           <button
@@ -42,12 +51,12 @@ export default function ProtectedContent({
 
       {/* Content with blur effect */}
       <div className="relative">
-        <div className={`${!isUnlocked ? `${blurAmount} pointer-events-none select-none` : ''}`}>
+        <div className={`${shouldShowLocked ? `${blurAmount} pointer-events-none select-none` : ''}`}>
           {children}
         </div>
 
         {/* Overlay backdrop when locked */}
-        {!isUnlocked && (
+        {shouldShowLocked && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}

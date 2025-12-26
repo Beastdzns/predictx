@@ -46,6 +46,8 @@ const ReplyItem = memo(({
   keyPath?: string;
 }) => {
   const openReplyDialog = useReplyDialogStore((state) => state.open);
+  const hasSocialCommentAccess = useAccessControlStore((state) => state.hasSocialCommentAccess);
+  const requestSocialCommentAccess = useAccessControlStore((state) => state.requestSocialCommentAccess);
 
   return (
     <motion.div
@@ -63,9 +65,14 @@ const ReplyItem = memo(({
           <img src={reply.imageUrl} alt="Reply" className="max-w-md w-full h-48 object-contain rounded border border-white/10" />
         )}
         <button
-          onClick={() => openReplyDialog(postId, reply._id, reply.username)}
-          className="text-white/50 hover:text-yellow-400 text-xs transition-colors"
+          onClick={() => {
+            if (requestSocialCommentAccess()) {
+              openReplyDialog(postId, reply._id, reply.username);
+            }
+          }}
+          className="text-white/50 hover:text-yellow-400 text-xs transition-colors flex items-center gap-1"
         >
+          {!hasSocialCommentAccess && <Lock className="w-3 h-3" />}
           Reply
         </button>
       </div>
@@ -127,6 +134,20 @@ export default function SocialPage() {
   const [replyingTo, setReplyingTo] = useState<{ postId: string; parentReplyId?: string } | null>(null);
   const [replyContent, setReplyContent] = useState('');
   const [replyImage, setReplyImage] = useState('');
+  const [showPostDialog, setShowPostDialog] = useState(false);
+
+  // Subscribe to access control state
+  const hasSocialViewAccess = useAccessControlStore((state) => state.hasSocialViewAccess);
+  const requestSocialViewAccess = useAccessControlStore((state) => state.requestSocialViewAccess);
+  const hasSocialPostAccess = useAccessControlStore((state) => state.hasSocialPostAccess);
+  const requestSocialPostAccess = useAccessControlStore((state) => state.requestSocialPostAccess);
+  const hasSocialCommentAccess = useAccessControlStore((state) => state.hasSocialCommentAccess);
+  const requestSocialCommentAccess = useAccessControlStore((state) => state.requestSocialCommentAccess);
+  
+  // Check for expired social access on mount
+  useEffect(() => {
+    useAccessControlStore.getState().checkAndResetExpiredSocialAccess();
+  }, []);
 
   // Check for username in localStorage
   useEffect(() => {
@@ -186,6 +207,7 @@ export default function SocialPage() {
       if (response.ok) {
         setNewPostContent('');
         setNewPostImage('');
+        setShowPostDialog(false);
         fetchPosts();
       }
     } catch (error) {
@@ -290,39 +312,63 @@ export default function SocialPage() {
 
       <h1 className="text-3xl font-bold text-yellow-400 mb-8">Community Feed</h1>
 
-      {/* Create Post */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="p-2 mb-6 space-y-3"
+      {/* Floating Create Post Button */}
+      <motion.button
+        initial={{ opacity: 0, scale: 0 }}
+        animate={{ opacity: 1, scale: 1 }}
+        whileHover={{ scale: 1.1 }}
+        whileTap={{ scale: 0.9 }}
+        onClick={() => {
+          if (requestSocialPostAccess()) {
+            setShowPostDialog(true);
+          }
+        }}
+        className="fixed bottom-24 right-6 z-40 bg-yellow-400 hover:bg-yellow-500 text-black p-4 rounded-full shadow-2xl transition-colors"
       >
-        <div className="flex items-center gap-2">
-          <span className="text-yellow-400 font-semibold">@{username}</span>
-        </div>
-        <textarea
-          placeholder="What's on your mind?"
-          value={newPostContent}
-          onChange={(e) => setNewPostContent(e.target.value)}
-          className="w-full bg-zinc-800 border border-white/10 rounded px-4 py-3 text-white resize-none focus:outline-none focus:border-yellow-400/50"
-          rows={3}
-        />
-        <div className="flex gap-2">
-          <input
-            type="text"
-            placeholder="Image URL (optional)"
-            value={newPostImage}
-            onChange={(e) => setNewPostImage(e.target.value)}
-            className="flex-1 bg-zinc-800 border border-white/10 rounded px-3 py-2 text-white text-sm focus:outline-none focus:border-yellow-400/50"
-          />
-          <Button onClick={createPost} className="bg-yellow-400 text-black hover:bg-yellow-500">
-            <Send className="w-4 h-4 mr-2" />
-            Post
-          </Button>
-        </div>
-      </motion.div>
+        {hasSocialPostAccess ? <Send className="w-6 h-6" /> : <Lock className="w-6 h-6" />}
+      </motion.button>
 
-      {/* Unlock Feed Button */}
-      <UnlockFeedButton />
+      {/* Create Post Dialog */}
+      <Dialog open={showPostDialog} onOpenChange={setShowPostDialog}>
+        <DialogContent className="bg-zinc-900 border-yellow-400/30 text-white">
+          <DialogHeader>
+            <DialogTitle className="text-yellow-400">Create Post</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="flex items-center gap-2">
+              <span className="text-yellow-400 font-semibold">@{username}</span>
+            </div>
+            <textarea
+              placeholder="What's on your mind?"
+              value={newPostContent}
+              onChange={(e) => setNewPostContent(e.target.value)}
+              className="w-full bg-zinc-800 border border-white/10 rounded px-4 py-3 text-white resize-none focus:outline-none focus:border-yellow-400/50"
+              rows={4}
+              autoFocus
+            />
+            <input
+              type="text"
+              placeholder="Image URL (optional)"
+              value={newPostImage}
+              onChange={(e) => setNewPostImage(e.target.value)}
+              className="w-full bg-zinc-800 border border-white/10 rounded px-4 py-2 text-white text-sm focus:outline-none focus:border-yellow-400/50"
+            />
+            <div className="flex gap-2 justify-end">
+              <Button
+                onClick={() => setShowPostDialog(false)}
+                variant="outline"
+                className="border-white/20 bg-transparent text-white hover:bg-white/10"
+              >
+                Cancel
+              </Button>
+              <Button onClick={createPost} className="bg-yellow-400 text-black hover:bg-yellow-500">
+                <Send className="w-4 h-4 mr-2" />
+                Post
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Sort Filter */}
       <div className="flex items-center gap-3 mb-4">
@@ -351,8 +397,8 @@ export default function SocialPage() {
 
       {/* Posts */}
       <ProtectedContent
-        isUnlocked={useAccessControlStore.getState().hasSocialViewAccess}
-        onUnlock={() => useAccessControlStore.getState().requestSocialViewAccess()}
+        isUnlocked={hasSocialViewAccess}
+        onUnlock={requestSocialViewAccess}
         blurAmount="blur-lg"
         message="Unlock Feed"
         title="Community Posts"
@@ -502,6 +548,7 @@ export default function SocialPage() {
                     <Button 
                       onClick={async () => {
                         if (!replyContent.trim()) return;
+                        if (!requestSocialCommentAccess()) return;
                         try {
                           const response = await fetch(`/api/posts/${selectedPost._id}`, {
                             method: 'POST',
@@ -526,6 +573,7 @@ export default function SocialPage() {
                       size="sm" 
                       className="bg-yellow-400 text-black hover:bg-yellow-500"
                     >
+                      {!hasSocialCommentAccess && <Lock className="w-4 h-4 mr-1" />}
                       Reply
                     </Button>
                   </div>

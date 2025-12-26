@@ -14,6 +14,9 @@ interface AccessControlState {
   hasSocialPostAccess: boolean;
   hasSocialViewAccess: boolean;
   hasSocialCommentAccess: boolean;
+  socialPostAccessTimestamp: number | null;
+  socialViewAccessTimestamp: number | null;
+  socialCommentAccessTimestamp: number | null;
 
   // Market-specific request methods (returns true if granted, false if denied)
   requestMarketAccess: (marketId: string) => boolean;
@@ -27,6 +30,10 @@ interface AccessControlState {
   requestSocialPostAccess: () => boolean;
   requestSocialViewAccess: () => boolean;
   requestSocialCommentAccess: () => boolean;
+  checkAndResetExpiredSocialAccess: () => void;
+
+  // Helper method to check expiration
+  _checkSocialAccessExpired: (timestamp: number | null) => boolean;
 
   // Check methods
   hasMarketAccess: (marketId: string) => boolean;
@@ -53,6 +60,17 @@ export const useAccessControlStore = create<AccessControlState>()(
       hasSocialPostAccess: false,
       hasSocialViewAccess: false,
       hasSocialCommentAccess: false,
+      socialPostAccessTimestamp: null,
+      socialViewAccessTimestamp: null,
+      socialCommentAccessTimestamp: null,
+
+      // Helper to check if access has expired (24 hours = 86400000 ms)
+      _checkSocialAccessExpired: (timestamp: number | null): boolean => {
+        if (!timestamp) return true;
+        const now = Date.now();
+        const twentyFourHours = 24 * 60 * 60 * 1000;
+        return (now - timestamp) > twentyFourHours;
+      },
 
       // Check methods
       hasMarketAccess: (marketId: string) => get().marketAccess[marketId] || false,
@@ -154,42 +172,80 @@ export const useAccessControlStore = create<AccessControlState>()(
       },
 
       requestSocialPostAccess: () => {
-        if (get().hasSocialPostAccess) return true;
+        const state = get();
+        // Check if access has expired
+        if (state.hasSocialPostAccess && !state._checkSocialAccessExpired(state.socialPostAccessTimestamp)) {
+          return true;
+        }
         const confirmed = window.confirm(
           '📝 Post to Community\n\n' +
-          'Do you want to create a new post?\n\n' +
+          'Do you want to create a new post?\n' +
+          'Access will be valid for 24 hours.\n\n' +
           'Click OK to proceed.'
         );
         if (confirmed) {
-          set({ hasSocialPostAccess: true });
+          set({ hasSocialPostAccess: true, socialPostAccessTimestamp: Date.now() });
         }
         return confirmed;
       },
 
       requestSocialViewAccess: () => {
-        if (get().hasSocialViewAccess) return true;
+        const state = get();
+        // Check if access has expired
+        if (state.hasSocialViewAccess && !state._checkSocialAccessExpired(state.socialViewAccessTimestamp)) {
+          return true;
+        }
         const confirmed = window.confirm(
           '🔓 Unlock Community Feed\n\n' +
-          'This will reveal all posts and discussions.\n\n' +
+          'This will reveal all posts and discussions.\n' +
+          'Access will be valid for 24 hours.\n\n' +
           'Do you want to proceed?'
         );
         if (confirmed) {
-          set({ hasSocialViewAccess: true });
+          set({ hasSocialViewAccess: true, socialViewAccessTimestamp: Date.now() });
         }
         return confirmed;
       },
 
       requestSocialCommentAccess: () => {
-        if (get().hasSocialCommentAccess) return true;
+        const state = get();
+        // Check if access has expired
+        if (state.hasSocialCommentAccess && !state._checkSocialAccessExpired(state.socialCommentAccessTimestamp)) {
+          return true;
+        }
         const confirmed = window.confirm(
           '💬 Post Comment\n\n' +
-          'Do you want to post this comment?\n\n' +
+          'Do you want to post this comment?\n' +
+          'Access will be valid for 24 hours.\n\n' +
           'Click OK to proceed.'
         );
         if (confirmed) {
-          set({ hasSocialCommentAccess: true });
+          set({ hasSocialCommentAccess: true, socialCommentAccessTimestamp: Date.now() });
         }
         return confirmed;
+      },
+
+      // Method to check and reset all expired social access
+      checkAndResetExpiredSocialAccess: () => {
+        const state = get();
+        const updates: Partial<AccessControlState> = {};
+
+        if (state.hasSocialPostAccess && state._checkSocialAccessExpired(state.socialPostAccessTimestamp)) {
+          updates.hasSocialPostAccess = false;
+          updates.socialPostAccessTimestamp = null;
+        }
+        if (state.hasSocialViewAccess && state._checkSocialAccessExpired(state.socialViewAccessTimestamp)) {
+          updates.hasSocialViewAccess = false;
+          updates.socialViewAccessTimestamp = null;
+        }
+        if (state.hasSocialCommentAccess && state._checkSocialAccessExpired(state.socialCommentAccessTimestamp)) {
+          updates.hasSocialCommentAccess = false;
+          updates.socialCommentAccessTimestamp = null;
+        }
+
+        if (Object.keys(updates).length > 0) {
+          set(updates);
+        }
       },
 
       resetAccess: () => {
@@ -203,6 +259,9 @@ export const useAccessControlStore = create<AccessControlState>()(
           hasSocialPostAccess: false,
           hasSocialViewAccess: false,
           hasSocialCommentAccess: false,
+          socialPostAccessTimestamp: null,
+          socialViewAccessTimestamp: null,
+          socialCommentAccessTimestamp: null,
         });
       },
     }),

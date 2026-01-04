@@ -4,10 +4,14 @@ import { PrivyProvider } from '@privy-io/react-auth';
 import { usePathname } from 'next/navigation';
 import Appbar from '@/components/shared/appbar';
 import Bottombar from '@/components/shared/bottombar';
+import { useWalletSync } from '@/lib/use-wallet-sync';
 
 function LayoutWrapper({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const isEventPage = pathname?.startsWith('/events/');
+
+  // Sync wallet with access control store
+  useWalletSync();
 
   return (
     <div suppressHydrationWarning>
@@ -38,8 +42,9 @@ export default function Providers({ children }: { children: React.ReactNode }) {
     <PrivyProvider
       appId={appId}
       config={{
+        // Configure Aptos embedded wallet for Movement Bedrock Testnet
         embeddedWallets: {
-          ethereum: {
+          aptos: {
             createOnLogin: 'all-users',
           },
         },
@@ -47,7 +52,10 @@ export default function Providers({ children }: { children: React.ReactNode }) {
           theme: 'dark',
           accentColor: '#facc15',
         },
+        // Login methods
         loginMethods: ['email', 'wallet', 'google', 'discord', 'github', 'twitter', 'sms', 'passkey'],
+        // Only show Aptos/Movement related options, hide EVM
+        walletConnectCloudProjectId: undefined,
       }}
     >
       <LayoutWrapper>

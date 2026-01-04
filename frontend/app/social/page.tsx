@@ -2,12 +2,12 @@
 
 import { useState, useEffect, useCallback, memo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { MessageSquare, ArrowBigUp, ArrowBigDown, Send, Image as ImageIcon, X, Lock } from 'lucide-react';
+import { MessageSquare, ArrowBigUp, ArrowBigDown, Send, Image as ImageIcon, X, Lock, Loader2, CheckCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { useReplyDialogStore } from '@/lib/store-reply-dialog';
-import { useAccessControlStore } from '@/lib/store-access';
-import ProtectedContent from '@/components/protected-content';
+import { x402Fetch } from '@/lib/x402-fetch';
+import { hasAppWallet } from '@/lib/x402-server-payment';
 
 interface Reply {
   _id: string;
@@ -36,7 +36,8 @@ const ReplyItem = memo(({
   depth = 0,
   formatTime,
   onRefresh,
-  keyPath = ''
+  keyPath = '',
+  onRequestCommentAccess
 }: { 
   reply: Reply; 
   postId: string; 
@@ -44,10 +45,18 @@ const ReplyItem = memo(({
   formatTime: (date: string) => string;
   onRefresh: () => void;
   keyPath?: string;
+  onRequestCommentAccess: () => Promise<boolean>;
 }) => {
   const openReplyDialog = useReplyDialogStore((state) => state.open);
-  const hasSocialCommentAccess = useAccessControlStore((state) => state.hasSocialCommentAccess);
-  const requestSocialCommentAccess = useAccessControlStore((state) => state.requestSocialCommentAccess);
+  const [hasCommentAccess, setHasCommentAccess] = useState(false);
+
+  const handleReplyClick = async () => {
+    const granted = await onRequestCommentAccess();
+    if (granted) {
+      setHasCommentAccess(true);
+      openReplyDialog(postId, reply._id, reply.username);
+    }
+  };
 
   return (
     <motion.div
@@ -65,14 +74,10 @@ const ReplyItem = memo(({
           <img src={reply.imageUrl} alt="Reply" className="max-w-md w-full h-48 object-contain rounded border border-white/10" />
         )}
         <button
-          onClick={() => {
-            if (requestSocialCommentAccess()) {
-              openReplyDialog(postId, reply._id, reply.username);
-            }
-          }}
+          onClick={handleReplyClick}
           className="text-white/50 hover:text-yellow-400 text-xs transition-colors flex items-center gap-1"
         >
-          {!hasSocialCommentAccess && <Lock className="w-3 h-3" />}
+          {!hasCommentAccess && <Lock className="w-3 h-3" />}
           Reply
         </button>
       </div>
@@ -88,6 +93,7 @@ const ReplyItem = memo(({
             formatTime={formatTime}
             onRefresh={onRefresh}
             keyPath={childKeyPath}
+            onRequestCommentAccess={onRequestCommentAccess}
           />
         );
       })}
@@ -97,13 +103,8 @@ const ReplyItem = memo(({
 
 ReplyItem.displayName = 'ReplyItem';
 
-// Unlock Feed Button Component
-function UnlockFeedButton() {
-  const hasSocialViewAccess = useAccessControlStore((state) => state.hasSocialViewAccess);
-  const requestSocialViewAccess = useAccessControlStore((state) => state.requestSocialViewAccess);
-
-  if (hasSocialViewAccess) return null;
-
+// x402 Unlock Feed Button Component
+function X402UnlockFeedButton({ onUnlock }: { onUnlock: () => void }) {
   return (
     <motion.div
       initial={{ opacity: 0, y: -10 }}
@@ -111,7 +112,7 @@ function UnlockFeedButton() {
       className="mb-6"
     >
       <button
-        onClick={requestSocialViewAccess}
+        onClick={onUnlock}
         className="w-full bg-linear-to-r from-yellow-400 to-yellow-500 hover:from-yellow-500 hover:to-yellow-600 text-black font-bold py-4 px-6 rounded-lg flex items-center justify-center gap-3 transition-all transform hover:scale-[1.02] shadow-lg"
       >
         <Lock className="w-5 h-5" />
@@ -136,18 +137,87 @@ export default function SocialPage() {
   const [replyImage, setReplyImage] = useState('');
   const [showPostDialog, setShowPostDialog] = useState(false);
 
-  // Subscribe to access control state
-  const hasSocialViewAccess = useAccessControlStore((state) => state.hasSocialViewAccess);
-  const requestSocialViewAccess = useAccessControlStore((state) => state.requestSocialViewAccess);
-  const hasSocialPostAccess = useAccessControlStore((state) => state.hasSocialPostAccess);
-  const requestSocialPostAccess = useAccessControlStore((state) => state.requestSocialPostAccess);
-  const hasSocialCommentAccess = useAccessControlStore((state) => state.hasSocialCommentAccess);
-  const requestSocialCommentAccess = useAccessControlStore((state) => state.requestSocialCommentAccess);
-  
-  // Check for expired social access on mount
-  useEffect(() => {
-    useAccessControlStore.getState().checkAndResetExpiredSocialAccess();
-  }, []);
+  // x402 access state - server-controlled
+  const [hasSocialViewAccess, setHasSocialViewAccess] = useState(false);
+  const [hasSocialPostAccess, setHasSocialPostAccess] = useState(false);
+  const [hasSocialCommentAccess, setHasSocialCommentAccess] = useState(false);
+  const [accessLoading, setAccessLoading] = useState<'view' | 'post' | 'comment' | null>(null);
+
+  // x402 unlock handlers
+  const requestSocialViewAccess = useCallback(async (): Promise<boolean> => {
+    if (hasSocialViewAccess) return true;
+    if (!hasAppWallet()) {
+      alert('Please set up your x402 payment wallet first. Go to Wallet page to configure.');
+      return false;
+    }
+    
+    setAccessLoading('view');
+    try {
+      const result = await x402Fetch('/api/x402/content/social_view/feed');
+      if (result.success) {
+        setHasSocialViewAccess(true);
+        console.log(`[x402] Social view unlocked. TX: ${result.tx_hash}`);
+        return true;
+      }
+      alert(result.error || 'Failed to unlock feed');
+      return false;
+    } catch (error) {
+      console.error('[x402] View access error:', error);
+      return false;
+    } finally {
+      setAccessLoading(null);
+    }
+  }, [hasSocialViewAccess]);
+
+  const requestSocialPostAccess = useCallback(async (): Promise<boolean> => {
+    if (hasSocialPostAccess) return true;
+    if (!hasAppWallet()) {
+      alert('Please set up your x402 payment wallet first. Go to Wallet page to configure.');
+      return false;
+    }
+    
+    setAccessLoading('post');
+    try {
+      const result = await x402Fetch('/api/x402/content/social_post/create');
+      if (result.success) {
+        setHasSocialPostAccess(true);
+        console.log(`[x402] Social post access unlocked. TX: ${result.tx_hash}`);
+        return true;
+      }
+      alert(result.error || 'Failed to unlock posting');
+      return false;
+    } catch (error) {
+      console.error('[x402] Post access error:', error);
+      return false;
+    } finally {
+      setAccessLoading(null);
+    }
+  }, [hasSocialPostAccess]);
+
+  const requestSocialCommentAccess = useCallback(async (): Promise<boolean> => {
+    if (hasSocialCommentAccess) return true;
+    if (!hasAppWallet()) {
+      alert('Please set up your x402 payment wallet first. Go to Wallet page to configure.');
+      return false;
+    }
+    
+    setAccessLoading('comment');
+    try {
+      const result = await x402Fetch('/api/x402/content/social_comment/reply');
+      if (result.success) {
+        setHasSocialCommentAccess(true);
+        console.log(`[x402] Social comment access unlocked. TX: ${result.tx_hash}`);
+        return true;
+      }
+      alert(result.error || 'Failed to unlock commenting');
+      return false;
+    } catch (error) {
+      console.error('[x402] Comment access error:', error);
+      return false;
+    } finally {
+      setAccessLoading(null);
+    }
+  }, [hasSocialCommentAccess]);
 
   // Check for username in localStorage
   useEffect(() => {
@@ -189,8 +259,8 @@ export default function SocialPage() {
   const createPost = async () => {
     if (!newPostContent.trim()) return;
     
-    // Check access before posting
-    const hasAccess = useAccessControlStore.getState().requestSocialPostAccess();
+    // Check access via x402 before posting
+    const hasAccess = await requestSocialPostAccess();
     if (!hasAccess) return;
 
     try {
@@ -318,14 +388,22 @@ export default function SocialPage() {
         animate={{ opacity: 1, scale: 1 }}
         whileHover={{ scale: 1.1 }}
         whileTap={{ scale: 0.9 }}
-        onClick={() => {
-          if (requestSocialPostAccess()) {
+        onClick={async () => {
+          const hasAccess = await requestSocialPostAccess();
+          if (hasAccess) {
             setShowPostDialog(true);
           }
         }}
-        className="fixed bottom-24 right-6 z-40 bg-yellow-400 hover:bg-yellow-500 text-black p-4 rounded-full shadow-2xl transition-colors"
+        disabled={accessLoading === 'post'}
+        className="fixed bottom-24 right-6 z-40 bg-yellow-400 hover:bg-yellow-500 text-black p-4 rounded-full shadow-2xl transition-colors disabled:opacity-50"
       >
-        {hasSocialPostAccess ? <Send className="w-6 h-6" /> : <Lock className="w-6 h-6" />}
+        {accessLoading === 'post' ? (
+          <Loader2 className="w-6 h-6 animate-spin" />
+        ) : hasSocialPostAccess ? (
+          <Send className="w-6 h-6" />
+        ) : (
+          <Lock className="w-6 h-6" />
+        )}
       </motion.button>
 
       {/* Create Post Dialog */}
@@ -395,15 +473,50 @@ export default function SocialPage() {
         </button>
       </div>
 
-      {/* Posts */}
-      <ProtectedContent
-        isUnlocked={hasSocialViewAccess}
-        onUnlock={requestSocialViewAccess}
-        blurAmount="blur-lg"
-        message="Unlock Feed"
-        title="Community Posts"
-      >
+      {/* Posts - x402 gated */}
+      {!hasSocialViewAccess ? (
+        <div className="relative">
+          {/* Unlock button */}
+          <X402UnlockFeedButton onUnlock={requestSocialViewAccess} />
+          
+          {/* Blurred preview */}
+          <div className="blur-lg pointer-events-none select-none">
+            <div className="space-y-4">
+              {[1, 2, 3].map((i) => (
+                <div key={i} className="border-b border-white/10 p-4 space-y-3">
+                  <div className="flex items-center gap-2">
+                    <span className="text-yellow-400 font-semibold">@user{i}</span>
+                    <span className="text-white/40 text-xs">2h ago</span>
+                  </div>
+                  <p className="text-white">This is a sample post. Unlock to see real community content...</p>
+                  <div className="flex items-center gap-4">
+                    <span className="text-white/50">▲ 12</span>
+                    <span className="text-white/50">▼ 3</span>
+                    <span className="text-white/50">💬 5</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+          
+          {/* Loading overlay */}
+          {accessLoading === 'view' && (
+            <div className="absolute inset-0 flex items-center justify-center bg-black/50">
+              <div className="flex flex-col items-center gap-3">
+                <Loader2 className="w-8 h-8 text-yellow-400 animate-spin" />
+                <p className="text-white/70 text-sm">Processing x402 payment...</p>
+              </div>
+            </div>
+          )}
+        </div>
+      ) : (
         <div className="space-y-4">
+          {/* Success badge */}
+          <div className="flex items-center gap-2 text-green-400 text-xs mb-4">
+            <CheckCircle className="w-4 h-4" />
+            <span>Feed unlocked via x402</span>
+          </div>
+          
           {loading ? (
             <div className="text-center text-white/40 py-12">Loading posts...</div>
           ) : posts.length === 0 ? (
@@ -467,7 +580,7 @@ export default function SocialPage() {
             ))
           )}
         </div>
-      </ProtectedContent>
+      )}
 
       {/* Post Detail Dialog */}
       <Dialog open={!!selectedPost} onOpenChange={() => setSelectedPost(null)}>
@@ -548,7 +661,8 @@ export default function SocialPage() {
                     <Button 
                       onClick={async () => {
                         if (!replyContent.trim()) return;
-                        if (!requestSocialCommentAccess()) return;
+                        const hasAccess = await requestSocialCommentAccess();
+                        if (!hasAccess) return;
                         try {
                           const response = await fetch(`/api/posts/${selectedPost._id}`, {
                             method: 'POST',
@@ -572,8 +686,13 @@ export default function SocialPage() {
                       }} 
                       size="sm" 
                       className="bg-yellow-400 text-black hover:bg-yellow-500"
+                      disabled={accessLoading === 'comment'}
                     >
-                      {!hasSocialCommentAccess && <Lock className="w-4 h-4 mr-1" />}
+                      {accessLoading === 'comment' ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : !hasSocialCommentAccess ? (
+                        <Lock className="w-4 h-4 mr-1" />
+                      ) : null}
                       Reply
                     </Button>
                   </div>
@@ -597,6 +716,7 @@ export default function SocialPage() {
                             const updatedPosts = await fetch('/api/posts').then(r => r.json());
                             setSelectedPost(updatedPosts.find((p: Post) => p._id === selectedPost._id));
                           }}
+                          onRequestCommentAccess={requestSocialCommentAccess}
                         />
                       );
                     })}
@@ -609,19 +729,31 @@ export default function SocialPage() {
       </Dialog>
 
       {/* Nested Reply Dialog */}
-      <ReplyDialog username={username} onRefresh={async () => {
-        await fetchPosts();
-        if (selectedPost) {
-          const updatedPosts = await fetch('/api/posts').then(r => r.json());
-          setSelectedPost(updatedPosts.find((p: Post) => p._id === selectedPost._id));
-        }
-      }} />
+      <ReplyDialog 
+        username={username} 
+        onRefresh={async () => {
+          await fetchPosts();
+          if (selectedPost) {
+            const updatedPosts = await fetch('/api/posts').then(r => r.json());
+            setSelectedPost(updatedPosts.find((p: Post) => p._id === selectedPost._id));
+          }
+        }}
+        onRequestAccess={requestSocialCommentAccess}
+      />
     </div>
   );
 }
 
-// Reply Dialog Component
-function ReplyDialog({ username, onRefresh }: { username: string; onRefresh: () => void }) {
+// Reply Dialog Component with x402 integration
+function ReplyDialog({ 
+  username, 
+  onRefresh,
+  onRequestAccess
+}: { 
+  username: string; 
+  onRefresh: () => void;
+  onRequestAccess: () => Promise<boolean>;
+}) {
   const { isOpen, postId, parentReplyId, parentUsername, close } = useReplyDialogStore();
   const [replyContent, setReplyContent] = useState('');
   const [replyImage, setReplyImage] = useState('');
@@ -630,8 +762,8 @@ function ReplyDialog({ username, onRefresh }: { username: string; onRefresh: () 
   const handleSubmit = async () => {
     if (!replyContent.trim() || !postId) return;
 
-    // Check access before replying
-    const hasAccess = useAccessControlStore.getState().requestSocialCommentAccess();
+    // Check access via x402 before replying
+    const hasAccess = await onRequestAccess();
     if (!hasAccess) return;
 
     setSubmitting(true);

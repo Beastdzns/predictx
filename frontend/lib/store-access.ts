@@ -1,5 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import { sendX402Payment, hasAppWallet } from './x402-server-payment';
+import { x402Config } from './movement-bedrock-config';
 
 interface AccessControlState {
   // Market-specific access (tracked by market ticker or event ticker)
@@ -18,18 +20,22 @@ interface AccessControlState {
   socialViewAccessTimestamp: number | null;
   socialCommentAccessTimestamp: number | null;
 
-  // Market-specific request methods (returns true if granted, false if denied)
-  requestMarketAccess: (marketId: string) => boolean;
-  requestChartAccess: (marketId: string) => boolean;
-  requestSentimentAccess: (marketId: string) => boolean;
-  requestOrderbookAccess: (marketId: string) => boolean;
-  requestTradeCalculatorAccess: (marketId: string) => boolean;
-  requestActivityAccess: (marketId: string) => boolean;
+  // Wallet reference for payments
+  currentWallet: any | null;
+  setCurrentWallet: (wallet: any) => void;
 
-  // Social request methods
-  requestSocialPostAccess: () => boolean;
-  requestSocialViewAccess: () => boolean;
-  requestSocialCommentAccess: () => boolean;
+  // Market-specific request methods with payment (returns true if granted, false if denied)
+  requestMarketAccess: (marketId: string) => Promise<boolean>;
+  requestChartAccess: (marketId: string) => Promise<boolean>;
+  requestSentimentAccess: (marketId: string) => Promise<boolean>;
+  requestOrderbookAccess: (marketId: string) => Promise<boolean>;
+  requestTradeCalculatorAccess: (marketId: string) => Promise<boolean>;
+  requestActivityAccess: (marketId: string) => Promise<boolean>;
+
+  // Social request methods with payment
+  requestSocialPostAccess: () => Promise<boolean>;
+  requestSocialViewAccess: () => Promise<boolean>;
+  requestSocialCommentAccess: () => Promise<boolean>;
   checkAndResetExpiredSocialAccess: () => void;
 
   // Helper method to check expiration
@@ -63,6 +69,12 @@ export const useAccessControlStore = create<AccessControlState>()(
       socialPostAccessTimestamp: null,
       socialViewAccessTimestamp: null,
       socialCommentAccessTimestamp: null,
+      currentWallet: null,
+
+      // Set wallet for payments
+      setCurrentWallet: (wallet: any) => {
+        set({ currentWallet: wallet });
+      },
 
       // Helper to check if access has expired (24 hours = 86400000 ms)
       _checkSocialAccessExpired: (timestamp: number | null): boolean => {
@@ -80,149 +92,329 @@ export const useAccessControlStore = create<AccessControlState>()(
       hasTradeCalculatorAccess: (marketId: string) => get().tradeCalculatorAccess[marketId] || false,
       hasActivityAccess: (marketId: string) => get().activityAccess[marketId] || false,
 
-      // Request methods with confirmation dialogs
-      requestMarketAccess: (marketId: string) => {
+      // Request methods with confirmation dialogs and payments
+      requestMarketAccess: async (marketId: string) => {
         if (get().marketAccess[marketId]) return true;
+        
+        if (!hasAppWallet()) {
+          alert('Please set up your x402 payment wallet first. Go to Settings to configure.');
+          return false;
+        }
+
         const confirmed = window.confirm(
           '🔒 Access Market Data\n\n' +
           'This will unlock market probability, volume, and open interest data for this specific market.\n\n' +
+          `Cost: ${x402Config.pricing.marketData} MOVE\n\n` +
           'Do you want to proceed?'
         );
-        if (confirmed) {
+        
+        if (!confirmed) return false;
+        
+        try {
+          const txHash = await sendX402Payment(
+            x402Config.recipientAddress,
+            x402Config.pricing.marketData
+          );
+          console.log(`[x402] Market access unlocked. TX: ${txHash}`);
+          
           set((state) => ({
             marketAccess: { ...state.marketAccess, [marketId]: true }
           }));
+          return true;
+        } catch (error) {
+          console.error('[x402] Payment failed:', error);
+          alert('Payment failed. Please try again.');
+          return false;
         }
-        return confirmed;
       },
 
-      requestChartAccess: (marketId: string) => {
+      requestChartAccess: async (marketId: string) => {
         if (get().chartAccess[marketId]) return true;
+        
+        if (!hasAppWallet()) {
+          alert('Please set up your x402 payment wallet first. Go to Settings to configure.');
+          return false;
+        }
+
         const confirmed = window.confirm(
           '🔒 Access Market Charts\n\n' +
           'This will unlock historical price charts and market trends for this specific market.\n\n' +
+          `Cost: ${x402Config.pricing.charts} MOVE\n\n` +
           'Do you want to proceed?'
         );
-        if (confirmed) {
+        
+        if (!confirmed) return false;
+        
+        try {
+          const txHash = await sendX402Payment(
+            x402Config.recipientAddress,
+            x402Config.pricing.charts
+          );
+          console.log(`[x402] Chart access unlocked. TX: ${txHash}`);
+          
           set((state) => ({
             chartAccess: { ...state.chartAccess, [marketId]: true }
           }));
+          return true;
+        } catch (error) {
+          console.error('[x402] Payment failed:', error);
+          alert('Payment failed. Please try again.');
+          return false;
         }
-        return confirmed;
       },
 
-      requestSentimentAccess: (marketId: string) => {
+      requestSentimentAccess: async (marketId: string) => {
         if (get().sentimentAccess[marketId]) return true;
+        
+        if (!hasAppWallet()) {
+          alert('Please set up your x402 payment wallet first. Go to Settings to configure.');
+          return false;
+        }
+
         const confirmed = window.confirm(
           '🔒 Access Market Sentiment\n\n' +
           'This will unlock AI-powered sentiment analysis and recommendations for this event.\n\n' +
+          `Cost: ${x402Config.pricing.sentiment} MOVE\n\n` +
           'Do you want to proceed?'
         );
-        if (confirmed) {
+        
+        if (!confirmed) return false;
+        
+        try {
+          const txHash = await sendX402Payment(
+            x402Config.recipientAddress,
+            x402Config.pricing.sentiment
+          );
+          console.log(`[x402] Sentiment access unlocked. TX: ${txHash}`);
+          
           set((state) => ({
             sentimentAccess: { ...state.sentimentAccess, [marketId]: true }
           }));
+          return true;
+        } catch (error) {
+          console.error('[x402] Payment failed:', error);
+          alert('Payment failed. Please try again.');
+          return false;
         }
-        return confirmed;
       },
 
-      requestOrderbookAccess: (marketId: string) => {
+      requestOrderbookAccess: async (marketId: string) => {
         if (get().orderbookAccess[marketId]) return true;
+        
+        if (!hasAppWallet()) {
+          alert('Please set up your x402 payment wallet first. Go to Settings to configure.');
+          return false;
+        }
+
         const confirmed = window.confirm(
           '🔒 Access Order Book\n\n' +
           'This will unlock real-time order book data showing all buy and sell orders for this market.\n\n' +
+          `Cost: ${x402Config.pricing.orderbook} MOVE\n\n` +
           'Do you want to proceed?'
         );
-        if (confirmed) {
+        
+        if (!confirmed) return false;
+        
+        try {
+          const txHash = await sendX402Payment(
+            x402Config.recipientAddress,
+            x402Config.pricing.orderbook
+          );
+          console.log(`[x402] Orderbook access unlocked. TX: ${txHash}`);
+          
           set((state) => ({
             orderbookAccess: { ...state.orderbookAccess, [marketId]: true }
           }));
+          return true;
+        } catch (error) {
+          console.error('[x402] Payment failed:', error);
+          alert('Payment failed. Please try again.');
+          return false;
         }
-        return confirmed;
       },
 
-      requestTradeCalculatorAccess: (marketId: string) => {
+      requestTradeCalculatorAccess: async (marketId: string) => {
         if (get().tradeCalculatorAccess[marketId]) return true;
+        
+        if (!hasAppWallet()) {
+          alert('Please set up your x402 payment wallet first. Go to Settings to configure.');
+          return false;
+        }
+
         const confirmed = window.confirm(
           '🔒 Access Trade Calculator\n\n' +
           'This will unlock the trading calculator to calculate potential profits for this market.\n\n' +
+          `Cost: ${x402Config.pricing.calculator} MOVE\n\n` +
           'Do you want to proceed?'
         );
-        if (confirmed) {
+        
+        if (!confirmed) return false;
+        
+        try {
+          const txHash = await sendX402Payment(
+            x402Config.recipientAddress,
+            x402Config.pricing.calculator
+          );
+          console.log(`[x402] Calculator access unlocked. TX: ${txHash}`);
+          
           set((state) => ({
             tradeCalculatorAccess: { ...state.tradeCalculatorAccess, [marketId]: true }
           }));
+          return true;
+        } catch (error) {
+          console.error('[x402] Payment failed:', error);
+          alert('Payment failed. Please try again.');
+          return false;
         }
-        return confirmed;
       },
 
-      requestActivityAccess: (marketId: string) => {
+      requestActivityAccess: async (marketId: string) => {
         if (get().activityAccess[marketId]) return true;
+        
+        if (!hasAppWallet()) {
+          alert('Please set up your x402 payment wallet first. Go to Settings to configure.');
+          return false;
+        }
+
         const confirmed = window.confirm(
           '🔒 Access Recent Activity\n\n' +
           'This will unlock recent trades and market activity data for this market/event.\n\n' +
+          `Cost: ${x402Config.pricing.activity} MOVE\n\n` +
           'Do you want to proceed?'
         );
-        if (confirmed) {
+        
+        if (!confirmed) return false;
+        
+        try {
+          const txHash = await sendX402Payment(
+            x402Config.recipientAddress,
+            x402Config.pricing.activity
+          );
+          console.log(`[x402] Activity access unlocked. TX: ${txHash}`);
+          
           set((state) => ({
             activityAccess: { ...state.activityAccess, [marketId]: true }
           }));
+          return true;
+        } catch (error) {
+          console.error('[x402] Payment failed:', error);
+          alert('Payment failed. Please try again.');
+          return false;
         }
-        return confirmed;
       },
 
-      requestSocialPostAccess: () => {
+      requestSocialPostAccess: async () => {
         const state = get();
         // Check if access has expired
         if (state.hasSocialPostAccess && !state._checkSocialAccessExpired(state.socialPostAccessTimestamp)) {
           return true;
         }
+        
+        if (!hasAppWallet()) {
+          alert('Please set up your x402 payment wallet first. Go to Settings to configure.');
+          return false;
+        }
+
         const confirmed = window.confirm(
           '📝 Post to Community\n\n' +
           'Do you want to create a new post?\n' +
           'Access will be valid for 24 hours.\n\n' +
+          `Cost: ${x402Config.pricing.socialPost} MOVE\n\n` +
           'Click OK to proceed.'
         );
-        if (confirmed) {
+        
+        if (!confirmed) return false;
+        
+        try {
+          const txHash = await sendX402Payment(
+            x402Config.recipientAddress,
+            x402Config.pricing.socialPost
+          );
+          console.log(`[x402] Social post access unlocked. TX: ${txHash}`);
+          
           set({ hasSocialPostAccess: true, socialPostAccessTimestamp: Date.now() });
+          return true;
+        } catch (error) {
+          console.error('[x402] Payment failed:', error);
+          alert('Payment failed. Please try again.');
+          return false;
         }
-        return confirmed;
       },
 
-      requestSocialViewAccess: () => {
+      requestSocialViewAccess: async () => {
         const state = get();
         // Check if access has expired
         if (state.hasSocialViewAccess && !state._checkSocialAccessExpired(state.socialViewAccessTimestamp)) {
           return true;
         }
+        
+        if (!hasAppWallet()) {
+          alert('Please set up your x402 payment wallet first. Go to Settings to configure.');
+          return false;
+        }
+
         const confirmed = window.confirm(
           '🔓 Unlock Community Feed\n\n' +
           'This will reveal all posts and discussions.\n' +
           'Access will be valid for 24 hours.\n\n' +
+          `Cost: ${x402Config.pricing.socialView} MOVE\n\n` +
           'Do you want to proceed?'
         );
-        if (confirmed) {
+        
+        if (!confirmed) return false;
+        
+        try {
+          const txHash = await sendX402Payment(
+            x402Config.recipientAddress,
+            x402Config.pricing.socialView
+          );
+          console.log(`[x402] Social view access unlocked. TX: ${txHash}`);
+          
           set({ hasSocialViewAccess: true, socialViewAccessTimestamp: Date.now() });
+          return true;
+        } catch (error) {
+          console.error('[x402] Payment failed:', error);
+          alert('Payment failed. Please try again.');
+          return false;
         }
-        return confirmed;
       },
 
-      requestSocialCommentAccess: () => {
+      requestSocialCommentAccess: async () => {
         const state = get();
         // Check if access has expired
         if (state.hasSocialCommentAccess && !state._checkSocialAccessExpired(state.socialCommentAccessTimestamp)) {
           return true;
         }
+        
+        if (!hasAppWallet()) {
+          alert('Please set up your x402 payment wallet first. Go to Settings to configure.');
+          return false;
+        }
+
         const confirmed = window.confirm(
           '💬 Post Comment\n\n' +
           'Do you want to post this comment?\n' +
           'Access will be valid for 24 hours.\n\n' +
+          `Cost: ${x402Config.pricing.socialComment} MOVE\n\n` +
           'Click OK to proceed.'
         );
-        if (confirmed) {
+        
+        if (!confirmed) return false;
+        
+        try {
+          const txHash = await sendX402Payment(
+            x402Config.recipientAddress,
+            x402Config.pricing.socialComment
+          );
+          console.log(`[x402] Social comment access unlocked. TX: ${txHash}`);
+          
           set({ hasSocialCommentAccess: true, socialCommentAccessTimestamp: Date.now() });
+          return true;
+        } catch (error) {
+          console.error('[x402] Payment failed:', error);
+          alert('Payment failed. Please try again.');
+          return false;
         }
-        return confirmed;
       },
 
       // Method to check and reset all expired social access

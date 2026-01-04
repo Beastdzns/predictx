@@ -253,27 +253,27 @@ export default function WalletPage() {
         </p>
 
         {/* Toggle Switch */}
-        <div className="bg-zinc-900 border border-yellow-500/30 rounded-xl p-1 mb-6 flex max-w-md">
+        <div className="bg-zinc-900 border mx-auto border-yellow-500/30 rounded-xl p-1 mb-6 flex max-w-xs">
           <button
             onClick={() => setActiveView('main')}
-            className={`flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-lg font-semibold transition-all ${
+            className={`flex-1 flex text-sm items-center justify-center gap-2 py-1 px-1 rounded-lg font-semibold transition-all ${
               activeView === 'main'
                 ? 'bg-yellow-500 text-black'
                 : 'text-gray-400 hover:text-white'
             }`}
           >
-            <Wallet2 className="h-5 w-5" />
+            <Wallet2 className="h-4 w-4" />
             Main Wallet
           </button>
           <button
             onClick={() => setActiveView('micropayments')}
-            className={`flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-lg font-semibold transition-all ${
+            className={`flex-1 flex text-sm items-center justify-center gap-2 py-1 px-1 rounded-lg font-semibold transition-all ${
               activeView === 'micropayments'
                 ? 'bg-yellow-500 text-black'
                 : 'text-gray-400 hover:text-white'
             }`}
           >
-            <CreditCard className="h-5 w-5" />
+            <CreditCard className="h-4 w-4" />
             Micropayments
           </button>
         </div>

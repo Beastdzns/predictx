@@ -173,7 +173,7 @@ export default function WalletPage() {
           <div className="bg-black border border-yellow-500/10 rounded-2xl p-6 mb-6 shadow-sm shadow-yellow-500/40 max-w-md">
             <h1 className="text-yellow-500 text-sm font-medium mb-4">Total Balance</h1>
             <h1 className="text-yellow-300 border border-yellow-500/30 rounded-lg bg-zinc-950 p-2 text-4xl font-bold mb-4 flex">
-              {isLoadingBalance ? '...' : parseFloat(balance).toFixed(4)} <span className='font-sans'><img src="/move.png" alt="" className='h-10 w-10 flex items-center justify-center'/></span>
+              {isLoadingBalance ? '...' : parseFloat(balance).toFixed(4)} <span className='font-sans'><img src="/movement_logo.png" alt="" className='h-10 w-10 flex items-center justify-center'/></span>
             </h1>
             <div className="bg-zinc-950 border border-yellow-500/30 rounded-lg p-3">
               <div className="flex items-center justify-between mb-2">
@@ -227,7 +227,7 @@ export default function WalletPage() {
           <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <img src="/move.png" alt="" className='w-10 h-10 rounded-full'/>
+                <img src="/movement_logo.png" alt="" className='w-10 h-10 rounded-full'/>
                 <div>
                   <p className="text-white font-semibold">Movement</p>
                   <p className="text-gray-400 text-xs">MOVE</p>

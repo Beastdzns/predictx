@@ -42,9 +42,9 @@ export default function Providers({ children }: { children: React.ReactNode }) {
     <PrivyProvider
       appId={appId}
       config={{
-        // Configure Aptos embedded wallet for Movement Bedrock Testnet
+        // Configure embedded wallets
         embeddedWallets: {
-          aptos: {
+          ethereum: {
             createOnLogin: 'all-users',
           },
         },

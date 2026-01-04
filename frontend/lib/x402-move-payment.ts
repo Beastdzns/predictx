@@ -134,13 +134,20 @@ export async function waitForTransaction(
       try {
         const tx = await aptos.getTransactionByHash({ transactionHash: txHash });
 
-        if (tx.success) {
-          console.log(`[x402] Transaction confirmed: ${txHash}`);
-          return true;
-        } else {
-          console.error(`[x402] Transaction failed: ${txHash}`);
-          return false;
+        // Check if transaction is committed (has 'type' field indicating it's no longer pending)
+        if ('type' in tx && tx.type !== 'pending_transaction') {
+          // For committed transactions, check the success field
+          const committedTx = tx as { success?: boolean };
+          if (committedTx.success) {
+            console.log(`[x402] Transaction confirmed: ${txHash}`);
+            return true;
+          } else {
+            console.error(`[x402] Transaction failed: ${txHash}`);
+            return false;
+          }
         }
+        // Still pending, wait and retry
+        await new Promise((resolve) => setTimeout(resolve, 2000));
       } catch (e) {
         // Transaction not yet available, wait and retry
         await new Promise((resolve) => setTimeout(resolve, 2000));

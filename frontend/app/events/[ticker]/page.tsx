@@ -346,16 +346,16 @@ export default function EventPage() {
                   <MarketSentiment
                     sentiment="neutral"
                     insights="AI-powered market sentiment analysis and recommendations."
-                    recommendations={['Unlock to see recommendations', 'Powered by x402']}
+                    recommendations={[]}
                     loading={false}
                   />
                 }
               >
                 {(data) => {
-                  const sentimentResult = data as { sentiment?: string; insights?: string; recommendations?: string[] };
+                  const sentimentResult = data as { sentiment?: string; insights?: string; recommendations?: Array<{ marketTitle: string; customStrike: string; recommendedSide: 'YES' | 'NO'; confidence: 'high' | 'medium' | 'low'; reason: string }> };
                   return (
                     <MarketSentiment
-                      sentiment={sentimentResult?.sentiment || 'neutral'}
+                      sentiment={(sentimentResult?.sentiment as 'bullish' | 'bearish' | 'neutral' | 'volatile') || 'neutral'}
                       insights={sentimentResult?.insights || ''}
                       recommendations={sentimentResult?.recommendations || []}
                       loading={false}

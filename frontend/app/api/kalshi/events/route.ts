@@ -4,7 +4,7 @@ const BASE_URL = 'https://api.elections.kalshi.com/trade-api/v2';
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
-  
+
   const params = new URLSearchParams();
   searchParams.forEach((value, key) => {
     params.append(key, value);

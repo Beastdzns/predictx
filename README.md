@@ -1,309 +1,273 @@
-# 🎯 X402PM
+# 🔮 PredictX — Decentralized Prediction Markets on Monad
 
-> **x402-Powered Prediction Market on Movement M1**
+<p align="center">
+  <img src="https://img.shields.io/badge/Monad-Testnet-purple?style=for-the-badge" alt="Monad Testnet" />
+  <img src="https://img.shields.io/badge/Solidity-0.8.24-blue?style=for-the-badge" alt="Solidity" />
+  <img src="https://img.shields.io/badge/Next.js-15-black?style=for-the-badge" alt="Next.js" />
+  <img src="https://img.shields.io/badge/x402-Payments-green?style=for-the-badge" alt="x402" />
+</p>
 
-A revolutionary prediction market where every action is unlocked only after a real MOVE payment on Movement M1, enforced via HTTP 402 and invisible wallets.
-
-[![Built on Movement M1](https://img.shields.io/badge/Built%20on-Movement%20M1-000000?style=flat-square)](https://movementnetwork.xyz)
-[![Payments via x402](https://img.shields.io/badge/Payments-x402-FF6B6B?style=flat-square)](https://github.com/anton-io/x402-utils)
-[![Wallet UX by Privy](https://img.shields.io/badge/Wallet%20UX-Privy-6366F1?style=flat-square)](https://privy.io)
-[![Next.js](https://img.shields.io/badge/Next.js-16.1-black?style=flat-square&logo=next.js)](https://nextjs.org)
-[![TypeScript](https://img.shields.io/badge/TypeScript-5.0-blue?style=flat-square&logo=typescript)](https://www.typescriptlang.org)
-
----
-
-## 🚨 What's Broken Today
-
-### Traditional Prediction Platforms Charge:
-- ❌ **Subscriptions** - Pay monthly/yearly regardless of usage
-- ❌ **Platform Fees** - Hidden costs on every transaction
-- ❌ **Upfront Costs** - Pay before you know if you'll use it
-
-### The Problems:
-- 💸 Users pay even if they don't consume data
-- 🔐 Wallets, keys, and gas confuse non-crypto users
-- 🤖 AI agents cannot pay for data autonomously
-
-### Result:
-- ❌ High friction
-- ❌ Poor monetization
-- ❌ Bad UX for humans & agents
+<p align="center">
+  <strong>Trade on the future. Powered by Monad's blazing-fast L1.</strong>
+</p>
 
 ---
 
-## ✨ What Our App Actually Does
+## 🚀 Overview
 
-### **Pay for Data, Not the App**
+**PredictX** is a decentralized prediction market platform built on **Monad Testnet**. Users can create markets, trade YES/NO shares using a constant-product AMM, and resolve outcomes via community voting or Pyth oracle integration.
 
-The app itself is **free**. Payments unlock specific data and insights.
+### ✨ Key Features
 
-#### ✅ What Users Pay For:
-- 📊 **Live prediction charts** - Real-time market visualization
-- 🤖 **AI confidence signals** - Machine learning insights
-- 👥 **Crowd sentiment & trends** - Community-driven analytics
-- 🔁 **Prediction updates / early exits** - Real-time market data
-- 📈 **Order book access** - Deep market liquidity data
-- 💬 **Social features** - Community posts and comments
-
-#### ❌ What Users Do NOT Pay For:
-- 🆓 App access
-- 🆓 Subscriptions
-- 🆓 Platform fees
-- 🆓 Basic browsing
+- 🎯 **Prediction Markets** — Create and trade on any event outcome
+- ⚡ **Monad L1** — Lightning-fast transactions with low fees
+- 🔗 **Twitter/X Blinks** — Trade directly from tweets via browser extension
+- 💳 **x402 Protocol** — HTTP-native micropayments for premium content
+- 🔐 **Privy Embedded Wallets** — Seamless UX with embedded wallet signing
+- 📊 **Real-time Data** — Kalshi market data integration
 
 ---
 
-## 🏗️ How It Works
+## 📍 Deployed Contracts
 
-### Protocol-Level Payments (x402 + Movement M1)
+### Monad Testnet (Chain ID: 10143)
+
+| Contract | Address | Explorer |
+|----------|---------|----------|
+| **PredictionMarket** | `0x342063473A0e5B1D1b69E3C2b8721490547E1df5` | [View on Explorer](https://testnet.monadexplorer.com/address/0x342063473A0e5B1D1b69E3C2b8721490547E1df5) |
+
+### Active Markets
+
+| ID | Question | Deadline |
+|----|----------|----------|
+| 0 | Will Bitcoin hit $100K by April 2026? | April 1, 2026 |
+| 1 | Will Monad mainnet launch by Q2 2026? | July 1, 2026 |
+| 2 | Will ETH surpass $5K by end of 2026? | Jan 1, 2027 |
+| 3 | Will AI agents manage $1B in crypto by 2027? | Jan 1, 2027 |
+| 4 | Will Solana flip Ethereum by TVL in 2026? | Jan 1, 2027 |
+
+---
+
+## 🏗️ Architecture
 
 ```
-1. User requests data (chart / signal / sentiment)
-   ↓
-2. Backend responds: HTTP 402 Payment Required
-   ↓
-3. Privy embedded wallet sends real MOVE transaction
-   ↓
-4. Same request is automatically retried
-   ↓
-5. Backend verifies payment on Movement M1 blockchain
-   ↓
-6. Data is returned to user
+predictx/
+├── contracts/          # Solidity smart contracts (Foundry)
+│   ├── src/
+│   │   └── PredictionMarket.sol    # Main AMM contract
+│   ├── script/
+│   │   ├── Deploy.s.sol            # Deployment script
+│   │   └── CreateMarkets.s.sol     # Market creation script
+│   └── test/
+│       └── PredictionMarket.t.sol  # Foundry tests
+│
+├── frontend/           # Next.js 15 web application
+│   ├── app/
+│   │   ├── api/blink/              # Blink API endpoints
+│   │   ├── blink-sign/             # Privy signing popup
+│   │   ├── events/                 # Market detail pages
+│   │   └── social/                 # Social feed
+│   ├── components/
+│   │   └── markets/                # Market UI components
+│   └── lib/
+│       ├── monad-config.ts         # Monad chain config
+│       ├── privy-monad-signing.ts  # Privy integration
+│       └── x402-*.ts               # x402 payment utils
+│
+├── ext-src/            # Browser extensions
+│   ├── solana-blink-ext/           # Twitter/X blinks extension
+│   └── pwa/                        # Progressive web app
+│
+├── x402-backend/       # Python FastAPI x402 payment server
+│   ├── payments/                   # Payment verification
+│   └── streaming/                  # WebSocket handlers
+│
+└── x402-prediction-backend/        # Prediction market backend
 ```
 
-**Key Point:** The MOVE payment is the **price of the data**, not a transaction fee.
+---
 
-### Why This Matters
+## 🔧 Smart Contract
 
-| Feature | Benefit |
-|---------|---------|
-| 💸 **Micro-payments** | Pay-per-insight (₹-level pricing) |
-| 🤖 **AI-Compatible** | Works for humans and AI agents |
-| 🔐 **No Seed Phrases** | Privy embedded wallets handle everything |
-| ⚡ **Fast Settlement** | Cheap, fast transactions on Movement M1 |
-| 🎯 **Pay-Per-Use** | Only pay for what you consume |
+### PredictionMarket.sol
 
-### Revenue Model
+A constant-product AMM for prediction markets with:
 
-- 💰 **Pay-per-chart** - Unlock historical price data
-- 💰 **Pay-per-signal** - Access AI predictions
-- 💰 **Pay-per-resolution** - Get early market insights
-- 💰 **Pay-per-social** - Community features
+- **1% Platform Fee** — Collected on each trade
+- **Community Voting** — Markets resolved by token holder votes
+- **Pyth Oracle** (Optional) — Price-based resolution
+- **48-hour Vote Window** — After market deadline
 
-> **Note:** Payments are signed and sent using Privy embedded wallets — no Nightly, no seed phrases. Privy is not our auth layer — it's our **invisible payment engine**.
+```solidity
+// Key Functions
+function createMarket(string question, uint256 deadline, ...) external payable;
+function buyYes(uint256 marketId) external payable;
+function buyNo(uint256 marketId) external payable;
+function sellYes(uint256 marketId, uint256 shares) external;
+function sellNo(uint256 marketId, uint256 shares) external;
+function vote(uint256 marketId, bool voteYes) external;
+function claimWinnings(uint256 marketId) external;
+```
+
+### Function Selectors
+
+| Function | Selector |
+|----------|----------|
+| `buyYes(uint256)` | `0x061dd98d` |
+| `buyNo(uint256)` | `0x58c36e5c` |
+| `createMarket(...)` | `0x...` |
+| `claimWinnings(uint256)` | `0x...` |
 
 ---
 
-## 🎯 Features
+## 🐦 Twitter/X Blinks
 
-### Market Features
+Trade prediction markets directly from Twitter with our browser extension!
 
-| Feature | Price | Description |
-|---------|-------|-------------|
-| 📊 Market Data | `0.001 MOVE` | Real-time market data access |
-| 📈 Charts | `0.002 MOVE` | Historical price charts |
-| 🤖 Sentiment Analysis | `0.003 MOVE` | AI-powered market insights |
-| 📋 Order Book | `0.0015 MOVE` | Real-time order data |
-| 🧮 Trade Calculator | `0.001 MOVE` | Profit/loss calculations |
-| 📊 Recent Activity | `0.0015 MOVE` | Trade history |
+### How It Works
 
-### Social Features
+1. **Tweet a Blink URL**: `https://predictx.vercel.app/api/blink/monad/0`
+2. **Extension detects it**: Renders an interactive trading card
+3. **Click Buy YES/NO**: Opens Privy signing popup
+4. **Sign & Trade**: Transaction sent to Monad
 
-| Feature | Price | Duration |
-|---------|-------|----------|
-| 👀 View Feed | `0.002 MOVE` | 24 hours |
-| ✍️ Create Post | `0.005 MOVE` | 24 hours |
-| 💬 Post Comment | `0.001 MOVE` | 24 hours |
+### Blink URL Format
 
-### Core Features
+```
+https://predictx.vercel.app/api/blink/monad/{marketId}
+```
 
-- 🔍 **Event Discovery** - Browse prediction markets by category
-- 📊 **Real-time Data** - Live market updates
-- 💳 **Invisible Payments** - Seamless wallet integration
-- 📱 **Mobile-First** - Responsive design with PWA support
-- 🎨 **Modern UI** - Beautiful, intuitive interface
-- 🔐 **Secure** - On-chain transaction verification
+### Example Markets
+
+- Market 0: `https://predictx.vercel.app/api/blink/monad/0`
+- Market 1: `https://predictx.vercel.app/api/blink/monad/1`
+- Market 2: `https://predictx.vercel.app/api/blink/monad/2`
 
 ---
 
-## 🛠️ Tech Stack
+## 💳 x402 Protocol Integration
 
-### Frontend
-- **Framework:** [Next.js 16.1](https://nextjs.org) with App Router
-- **Language:** TypeScript
-- **Styling:** Tailwind CSS 4
-- **UI Components:** Radix UI, Lucide Icons
-- **State Management:** Zustand
-- **Animations:** Framer Motion
-- **Charts:** Recharts
+PredictX uses the **x402 HTTP Payment Protocol** for:
 
-### Blockchain & Payments
-- **Network:** Movement Bedrock Testnet (Aptos-compatible)
-- **Payment Protocol:** [x402](https://github.com/anton-io/x402-utils)
-- **Wallet Provider:** [Privy](https://privy.io) (Embedded Wallets)
-- **SDK:** Aptos TypeScript SDK
+- Premium market insights
+- Exclusive analysis
+- Ad-free experience
 
-### Backend
-- **API:** Next.js API Routes
-- **Database:** MongoDB (via Mongoose)
-- **Payment Verification:** On-chain transaction verification
+### How x402 Works
+
+1. Server returns `402 Payment Required` with payment details
+2. Client signs payment with embedded wallet
+3. Payment header sent with retry request
+4. Server verifies and serves content
 
 ---
 
-## 🚀 Getting Started
+## 🛠️ Development Setup
 
 ### Prerequisites
 
-- Node.js 20+ 
-- pnpm 9+ (or npm/yarn)
-- MongoDB (for backend features)
-- Privy App ID and Secret
+- Node.js 20+
+- pnpm 8+
+- Foundry (for contracts)
+- Python 3.10+ (for backend)
 
-### Installation
+### Frontend
 
-1. **Clone the repository**
-   ```bash
-   git clone <repository-url>
-   ```
-
-2. **Install dependencies**
-   ```bash
-   cd frontend
-   pnpm install
-   ```
-
-3. **Set up environment variables**
-   
-   Create `.env.local` in the `frontend` directory:
-   ```env
-   # Privy Configuration
-   NEXT_PUBLIC_PRIVY_APP_ID=your_privy_app_id
-   PRIVY_APP_SECRET=your_privy_app_secret
-
-   # x402 Backend (optional, for full backend integration)
-   NEXT_PUBLIC_X402_API_URL=http://localhost:8990
-
-   # MongoDB (optional, for social features)
-   MONGODB_URI=your_mongodb_connection_string
-   ```
-
-4. **Get Privy Credentials**
-   - Go to [Privy Dashboard](https://dashboard.privy.io/)
-   - Create a new app or use existing
-   - Copy App ID and App Secret to `.env.local`
-   - Privy automatically supports Aptos/Movement chains
-
-5. **Run the development server**
-   ```bash
-   pnpm dev
-   ```
-
-6. **Open your browser**
-   Navigate to [http://localhost:3000](http://localhost:3000)
-
-### Getting Testnet MOVE
-
-1. Visit [Movement Faucet](https://faucet.movementnetwork.xyz/)
-2. Connect your wallet (or use Privy embedded wallet)
-3. Request testnet MOVE tokens
-4. Start using the app!
-
----
-
-
-## 🏛️ Architecture
-
-### Payment Flow
-
-```
-┌──────────────┐
-│   User       │
-│   Request    │
-└──────┬───────┘
-       │
-       ▼
-┌─────────────────┐
-│  Frontend       │
-│  (Next.js)      │
-└──────┬──────────┘
-       │
-       ▼
-┌─────────────────┐      HTTP 402      ┌──────────────┐
-│  Backend API    │◄───────────────────│     x402     │
-│  (Next.js API)  │   Payment Required │    Backend   │
-└──────┬──────────┘                    └──────────────┘
-       │
-       ▼
-┌─────────────────┐
-│  Privy Wallet   │
-│  (Embedded)     │
-└──────┬──────────┘
-       │
-       ▼
-┌─────────────────┐
-│  Movement M1    │
-│  Blockchain     │
-└─────────────────┘
+```bash
+cd frontend
+pnpm install
+cp .env.example .env.local
+# Add your Privy App ID and other keys
+pnpm dev
 ```
 
-### Key Components
+### Smart Contracts
 
-- **`lib/store-access.ts`** - Access control store with payment integration
-- **`lib/x402-server-payment.ts`** - Server-side payment utilities
-- **`lib/x402-fetch.ts`** - HTTP 402-aware fetch wrapper
-- **`components/x402-protected-content.tsx`** - React component for protected content
-- **`app/api/x402/`** - Backend API routes for payment verification
+```bash
+cd contracts
+forge install
+forge build
+forge test
 
----
+# Deploy to Monad Testnet
+forge script script/Deploy.s.sol --rpc-url https://testnet-rpc.monad.xyz --broadcast
+```
 
-## 🔧 Configuration
+### Browser Extension
 
-### Movement Bedrock Testnet
+```bash
+cd ext-src/solana-blink-ext
+pnpm install
+pnpm build
+# Load dist/ folder in Chrome as unpacked extension
+```
 
-- **RPC URL:** `https://testnet.movementnetwork.xyz/v1`
-- **Chain ID:** `250` (Aptos-compatible)
-- **Explorer:** `https://explorer.movementnetwork.xyz/?network=testnet`
-- **Faucet:** `https://faucet.movementnetwork.xyz/`
-- **Native Currency:** MOVE (8 decimals)
+### Backend
 
-### x402 Pricing
-
-Configured in `lib/movement-bedrock-config.ts`:
-
-```typescript
-export const x402Config = {
-  recipientAddress: "0x1c3aee2b139c069bac975c7f87c4dce8143285f1ec7df2889f5ae1c08ae1ba53",
-  pricing: {
-    marketData: "100000",    // 0.001 MOVE
-    charts: "200000",        // 0.002 MOVE
-    sentiment: "300000",     // 0.003 MOVE
-    orderbook: "150000",     // 0.0015 MOVE
-    // ... more pricing
-  },
-};
+```bash
+cd x402-backend
+pip install -r requirements.txt
+python main.py
 ```
 
 ---
 
-## 🔗 Resources
+## 🔑 Environment Variables
 
-- [Movement Network](https://movementnetwork.xyz/) - Official Movement docs
-- [x402 Protocol](https://github.com/anton-io/x402-utils) - x402 payment protocol
-- [Privy Docs](https://docs.privy.io/) - Privy wallet documentation
-- [Aptos SDK](https://aptos.dev/) - Aptos TypeScript SDK (Movement-compatible)
+### Frontend (.env.local)
+
+```env
+NEXT_PUBLIC_PRIVY_APP_ID=your_privy_app_id
+NEXT_PUBLIC_PREDICTION_MARKET_ADDRESS=0x342063473A0e5B1D1b69E3C2b8721490547E1df5
+NEXT_PUBLIC_MONAD_RPC_URL=https://testnet-rpc.monad.xyz
+```
+
+### Backend
+
+```env
+MONGODB_URI=mongodb://...
+PRIVATE_KEY=0x...
+```
 
 ---
 
-## 🙏 Acknowledgments
+## 🌐 Network Configuration
 
-- Built on [Movement M1](https://movementnetwork.xyz/)
-- Payments powered by [x402](https://github.com/anton-io/x402-utils)
-- Wallet UX by [Privy](https://privy.io)
+### Monad Testnet
+
+| Property | Value |
+|----------|-------|
+| Chain ID | `10143` |
+| RPC URL | `https://testnet-rpc.monad.xyz` |
+| Currency | `MON` |
+| Explorer | `https://testnet.monadexplorer.com` |
 
 ---
 
-<div align="center">
+## 📜 License
 
-**Built with ❤️ using Movement M1 + Privy + x402 for Movement Ecosystem**
+MIT License — see [LICENSE](LICENSE) for details.
 
-</div>
+---
+
+## 🤝 Contributing
+
+1. Fork the repository
+2. Create your feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
+
+---
+
+## 🔗 Links
+
+- **Live Demo**: [predictx.vercel.app](https://predictx.vercel.app)
+- **Contract Explorer**: [Monad Testnet Explorer](https://testnet.monadexplorer.com/address/0x342063473A0e5B1D1b69E3C2b8721490547E1df5)
+- **Twitter**: [@PredictX](https://twitter.com/PredictX)
+
+---
+
+<p align="center">
+  Built with ⚡ on <strong>Monad</strong>
+</p>

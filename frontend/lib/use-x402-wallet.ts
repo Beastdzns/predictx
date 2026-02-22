@@ -1,135 +1,65 @@
-/**
- * React hook for managing the x402 app-owned payment wallet
- */
-
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
-import { usePrivy } from '@privy-io/react-auth';
-import {
-  AppOwnedWallet,
-  getStoredAppWallet,
-  createAppWallet,
-  getAppWalletBalance,
-} from './x402-server-payment';
+/**
+ * React hook for managing the x402 payment flow with Privy EVM wallet on Monad
+ * Replaces use-x402-wallet.ts — uses Privy EVM embedded wallet instead of app-owned wallet
+ */
 
-interface UseX402WalletResult {
-  // Wallet state
-  wallet: AppOwnedWallet | null;
-  balance: string | null;
-  isLoading: boolean;
-  error: string | null;
-  
-  // Computed state
-  hasWallet: boolean;
-  isReady: boolean;
-  
-  // Actions
-  createWallet: () => Promise<boolean>;
-  refreshBalance: () => Promise<void>;
-}
+import { useCallback } from 'react';
+import { useMonadWallet, useX402MonPayment } from './use-privy-monad';
+import { x402Fetch } from './x402-fetch';
+import { sendMonPayment } from './privy-monad-signing';
 
 /**
- * Hook to manage the x402 app-owned wallet for micropayments
+ * Unified hook for x402 content unlocking on Monad
  */
-export function useX402Wallet(): UseX402WalletResult {
-  const { user, authenticated } = usePrivy();
-  
-  const [wallet, setWallet] = useState<AppOwnedWallet | null>(null);
-  const [balance, setBalance] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  // Load wallet from localStorage on mount
-  useEffect(() => {
-    const stored = getStoredAppWallet();
-    if (stored) {
-      setWallet(stored);
-    }
-  }, []);
-
-  // Refresh balance when wallet changes
-  useEffect(() => {
-    if (wallet) {
-      getAppWalletBalance(wallet.address).then(setBalance).catch(console.error);
-    }
-  }, [wallet]);
-
-  // Refresh balance function
-  const refreshBalance = useCallback(async () => {
-    if (!wallet) return;
-    
-    try {
-      const bal = await getAppWalletBalance(wallet.address);
-      setBalance(bal);
-    } catch (e) {
-      console.error('[x402] Failed to get balance:', e);
-    }
-  }, [wallet]);
-
-  // Create a new wallet
-  const createWallet = useCallback(async (): Promise<boolean> => {
-    if (!authenticated || !user?.id) {
-      setError('Please log in first');
-      return false;
-    }
-
-    setIsLoading(true);
-    setError(null);
-
-    try {
-      const newWallet = await createAppWallet(user.id);
-      setWallet(newWallet);
-      
-      // Request funds from faucet via our API route
-      console.log('[x402] Requesting funds from faucet for', newWallet.address);
-      try {
-        const faucetResponse = await fetch('/api/faucet', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            address: newWallet.address,
-          }),
-        });
-
-        if (faucetResponse.ok) {
-          console.log('[x402] Faucet request successful');
-          // Wait a bit for the transaction to be processed
-          await new Promise(resolve => setTimeout(resolve, 3000));
-        } else {
-          const errorData = await faucetResponse.json();
-          console.warn('[x402] Faucet request failed:', errorData);
-        }
-      } catch (faucetError) {
-        console.warn('[x402] Failed to request from faucet:', faucetError);
-        // Don't fail wallet creation if faucet fails
-      }
-      
-      // Get initial balance (after faucet attempt)
-      const bal = await getAppWalletBalance(newWallet.address);
-      setBalance(bal);
-      
-      return true;
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : 'Failed to create wallet';
-      setError(msg);
-      console.error('[x402] Wallet creation failed:', e);
-      return false;
-    } finally {
-      setIsLoading(false);
-    }
-  }, [authenticated, user?.id]);
-
-  return {
-    wallet,
-    balance,
+export function useX402Wallet() {
+  const { address, hasWallet, getProvider, switchToMonad } = useMonadWallet();
+  const {
+    makePayment,
+    paymentStatus,
+    resetStatus,
     isLoading,
     error,
-    hasWallet: wallet !== null,
-    isReady: wallet !== null && balance !== null && parseFloat(balance) > 0,
-    createWallet,
-    refreshBalance,
+  } = useX402MonPayment();
+
+  /**
+   * Fetch x402-gated content — auto-handles 402 → pay → retry
+   */
+  const fetchGated = useCallback(
+    async <T = unknown>(url: string): Promise<{ success: boolean; data?: T; error?: string; paid?: boolean }> => {
+      if (!address) return { success: false, error: 'No wallet connected' };
+
+      try {
+        await switchToMonad();
+        const provider = await getProvider();
+
+        const sendPaymentFn = async (recipient: `0x${string}`, amountWei: bigint) => {
+          return sendMonPayment(provider, address, recipient, amountWei);
+        };
+
+        return x402Fetch<T>(url, sendPaymentFn, address);
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        return { success: false, error: msg };
+      }
+    },
+    [address, getProvider, switchToMonad]
+  );
+
+  return {
+    // State
+    walletAddress: address,
+    hasWallet,
+    isLoading,
+    error,
+    paymentStatus,
+
+    // Direct content-type payment
+    makePayment,
+    resetStatus,
+
+    // Generic gated fetch
+    fetchGated,
   };
 }

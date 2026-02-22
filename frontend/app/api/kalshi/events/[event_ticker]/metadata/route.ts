@@ -6,10 +6,9 @@ export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ event_ticker: string }> }
 ) {
-  const { event_ticker: eventTicker } = await params;
-
+  const { event_ticker } = await params;
   try {
-    const response = await fetch(`${BASE_URL}/events/${eventTicker}/metadata`, {
+    const response = await fetch(`${BASE_URL}/events/${event_ticker}/metadata`, {
       headers: {
         "Accept": "application/json",
       },

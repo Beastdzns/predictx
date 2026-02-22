@@ -4,12 +4,11 @@ const BASE_URL = 'https://api.elections.kalshi.com/trade-api/v2';
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
-  const category = searchParams.get('category');
-  const tags = searchParams.get('tags');
 
   const params = new URLSearchParams();
-  if (category) params.append('category', category);
-  if (tags) params.append('tags', tags);
+  searchParams.forEach((value, key) => {
+    params.append(key, value);
+  });
 
   try {
     const response = await fetch(`${BASE_URL}/series?${params.toString()}`, {

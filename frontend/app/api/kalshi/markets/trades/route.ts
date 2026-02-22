@@ -4,9 +4,9 @@ const KALSHI_API_BASE = 'https://api.elections.kalshi.com/trade-api/v2';
 
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
-  
+
   const kalshiParams = new URLSearchParams();
-  
+
   // Forward all query parameters
   searchParams.forEach((value, key) => {
     kalshiParams.append(key, value);

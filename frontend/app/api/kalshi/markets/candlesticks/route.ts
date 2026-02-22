@@ -3,38 +3,19 @@ import { NextRequest, NextResponse } from 'next/server';
 const KALSHI_API_BASE = 'https://api.elections.kalshi.com/trade-api/v2';
 
 export async function GET(request: NextRequest) {
+  const { searchParams } = new URL(request.url);
+  const params = new URLSearchParams();
+
+  searchParams.forEach((value, key) => {
+    params.append(key, value);
+  });
+
   try {
-    const searchParams = request.nextUrl.searchParams;
-    
-    const marketTickers = searchParams.get('market_tickers');
-    const startTs = searchParams.get('start_ts');
-    const endTs = searchParams.get('end_ts');
-    const periodInterval = searchParams.get('period_interval');
-    const includeLatestBeforeStart = searchParams.get('include_latest_before_start');
-
-    if (!marketTickers || !startTs || !endTs || !periodInterval) {
-      return NextResponse.json(
-        { error: 'Missing required parameters' },
-        { status: 400 }
-      );
-    }
-
-    const params = new URLSearchParams();
-    params.append('market_tickers', marketTickers);
-    params.append('start_ts', startTs);
-    params.append('end_ts', endTs);
-    params.append('period_interval', periodInterval);
-    if (includeLatestBeforeStart) {
-      params.append('include_latest_before_start', includeLatestBeforeStart);
-    }
-
     const response = await fetch(
       `${KALSHI_API_BASE}/markets/candlesticks?${params.toString()}`,
       {
-        headers: {
-          'Accept': 'application/json',
-        },
-        cache: 'no-store',
+        headers: { "Accept": "application/json" },
+        cache: "no-store",
       }
     );
 
@@ -50,7 +31,7 @@ export async function GET(request: NextRequest) {
     const data = await response.json();
     return NextResponse.json(data);
   } catch (error) {
-    console.error('Error in candlesticks route:', error);
+    console.error('Error fetching candlesticks:', error);
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

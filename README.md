@@ -262,9 +262,8 @@ MIT License — see [LICENSE](LICENSE) for details.
 
 ## 🔗 Links
 
-- **Live Demo**: [predictx.vercel.app](https://predictx.vercel.app)
+- **Live Demo**: [predictx.vercel.app]
 - **Contract Explorer**: [Monad Testnet Explorer](https://testnet.monadexplorer.com/address/0x342063473A0e5B1D1b69E3C2b8721490547E1df5)
-- **Twitter**: [@PredictX](https://twitter.com/PredictX)
 
 ---
 

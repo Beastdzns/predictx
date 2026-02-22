@@ -1,0 +1,425 @@
+/* PredictX Blink Card Styles - Premium UI */
+
+/* Reset */
+.predictx-card-container,
+.predictx-card-container * {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+/* Container */
+.predictx-card-container {
+  margin: 16px 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', Roboto, sans-serif;
+  max-width: 100%;
+  animation: predictx-fadeIn 0.3s ease-out;
+}
+
+@keyframes predictx-fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Main Card */
+.predictx-card {
+  background: linear-gradient(145deg, #18181b 0%, #0f0f12 100%);
+  border: 1px solid rgba(250, 204, 21, 0.15);
+  border-radius: 16px;
+  overflow: hidden;
+  position: relative;
+}
+
+.predictx-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, #facc15 0%, #f59e0b 50%, #facc15 100%);
+  background-size: 200% 100%;
+  animation: predictx-shimmer 2s linear infinite;
+}
+
+@keyframes predictx-shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* Header */
+.predictx-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px 10px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.predictx-badge {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  background: linear-gradient(135deg, rgba(250, 204, 21, 0.15) 0%, rgba(245, 158, 11, 0.1) 100%);
+  border: 1px solid rgba(250, 204, 21, 0.25);
+  border-radius: 8px;
+  color: #facc15;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.predictx-market-id {
+  color: rgba(255, 255, 255, 0.4);
+  font-size: 11px;
+  font-family: 'SF Mono', Monaco, monospace;
+}
+
+/* Question Section */
+.predictx-question-section {
+  padding: 16px;
+}
+
+.predictx-question {
+  color: #ffffff;
+  font-size: 17px;
+  font-weight: 700;
+  line-height: 1.4;
+  margin-bottom: 8px;
+  padding: 0 16px;
+}
+
+.predictx-meta {
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 12px;
+  line-height: 1.5;
+  padding: 0 16px 12px;
+}
+
+/* Chart Section */
+.predictx-chart-section {
+  padding: 0 16px 12px;
+  position: relative;
+}
+
+.predictx-chart-container {
+  width: 100%;
+  height: 70px;
+  position: relative;
+  background: linear-gradient(180deg, rgba(250, 204, 21, 0.03) 0%, transparent 100%);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.predictx-sparkline {
+  width: 100%;
+  height: 100%;
+}
+
+.predictx-sparkline-path {
+  fill: none;
+  stroke: #facc15;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  filter: drop-shadow(0 0 6px rgba(250, 204, 21, 0.5));
+}
+
+.predictx-sparkline-area {
+  fill: url(#predictx-gradient);
+  opacity: 0.3;
+}
+
+.predictx-sparkline-dot {
+  fill: #facc15;
+  filter: drop-shadow(0 0 4px rgba(250, 204, 21, 0.8));
+  animation: predictx-pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes predictx-pulse {
+  0%, 100% { opacity: 1; r: 4; }
+  50% { opacity: 0.6; r: 6; }
+}
+
+/* Probability Bar */
+.predictx-probability {
+  padding: 0 16px 16px;
+}
+
+.predictx-prob-bar-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.predictx-prob-bar-container {
+  flex: 1;
+  height: 8px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+  overflow: hidden;
+  position: relative;
+}
+
+.predictx-prob-bar-yes {
+  height: 100%;
+  background: linear-gradient(90deg, #22c55e 0%, #4ade80 100%);
+  border-radius: 4px;
+  transition: width 0.5s ease;
+  position: relative;
+}
+
+.predictx-prob-bar-yes::after {
+  content: '';
+  position: absolute;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  width: 20px;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3));
+}
+
+.predictx-prob-labels {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+}
+
+.predictx-prob-yes {
+  color: #4ade80;
+  font-weight: 600;
+}
+
+.predictx-prob-no {
+  color: #f87171;
+  font-weight: 600;
+}
+
+/* Stats Row */
+.predictx-stats {
+  display: flex;
+  justify-content: space-between;
+  padding: 0 16px 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.predictx-stat {
+  text-align: center;
+}
+
+.predictx-stat-value {
+  color: #ffffff;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.predictx-stat-label {
+  color: rgba(255, 255, 255, 0.4);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-top: 2px;
+}
+
+/* Actions */
+.predictx-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  padding: 14px 16px;
+}
+
+.predictx-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 14px 16px;
+  border: none;
+  border-radius: 12px;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-family: inherit;
+}
+
+.predictx-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.predictx-btn-yes {
+  background: linear-gradient(135deg, rgba(34, 197, 94, 0.2) 0%, rgba(34, 197, 94, 0.1) 100%);
+  border: 1px solid rgba(34, 197, 94, 0.4);
+  color: #4ade80;
+}
+
+.predictx-btn-yes:hover:not(:disabled) {
+  background: linear-gradient(135deg, rgba(34, 197, 94, 0.3) 0%, rgba(34, 197, 94, 0.15) 100%);
+  border-color: rgba(34, 197, 94, 0.6);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 15px rgba(34, 197, 94, 0.25);
+}
+
+.predictx-btn-no {
+  background: linear-gradient(135deg, rgba(239, 68, 68, 0.2) 0%, rgba(239, 68, 68, 0.1) 100%);
+  border: 1px solid rgba(239, 68, 68, 0.4);
+  color: #f87171;
+}
+
+.predictx-btn-no:hover:not(:disabled) {
+  background: linear-gradient(135deg, rgba(239, 68, 68, 0.3) 0%, rgba(239, 68, 68, 0.15) 100%);
+  border-color: rgba(239, 68, 68, 0.6);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 15px rgba(239, 68, 68, 0.25);
+}
+
+/* Amount Input */
+.predictx-amount-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 16px 14px;
+}
+
+.predictx-amount-input {
+  flex: 1;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  padding: 12px 14px;
+  color: #ffffff;
+  font-size: 15px;
+  font-weight: 600;
+  font-family: inherit;
+  outline: none;
+  transition: all 0.2s ease;
+}
+
+.predictx-amount-input:focus {
+  border-color: rgba(250, 204, 21, 0.5);
+  box-shadow: 0 0 0 3px rgba(250, 204, 21, 0.1);
+}
+
+.predictx-amount-input::placeholder {
+  color: rgba(255, 255, 255, 0.3);
+}
+
+.predictx-mon {
+  color: #facc15;
+  font-size: 14px;
+  font-weight: 700;
+  padding: 12px 16px;
+  background: rgba(250, 204, 21, 0.1);
+  border: 1px solid rgba(250, 204, 21, 0.2);
+  border-radius: 10px;
+}
+
+/* Quick Amount Buttons */
+.predictx-quick-amounts {
+  display: flex;
+  gap: 6px;
+  padding: 0 16px 10px;
+}
+
+.predictx-quick-btn {
+  flex: 1;
+  padding: 6px 8px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-family: inherit;
+}
+
+.predictx-quick-btn:hover {
+  background: rgba(250, 204, 21, 0.1);
+  border-color: rgba(250, 204, 21, 0.3);
+  color: #facc15;
+}
+
+/* Status */
+.predictx-status {
+  padding: 12px 16px;
+  margin: 0 16px 14px;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 500;
+  text-align: center;
+}
+
+.predictx-status-loading {
+  background: rgba(250, 204, 21, 0.1);
+  border: 1px solid rgba(250, 204, 21, 0.25);
+  color: #facc15;
+}
+
+.predictx-status-success {
+  background: rgba(34, 197, 94, 0.1);
+  border: 1px solid rgba(34, 197, 94, 0.25);
+  color: #4ade80;
+}
+
+.predictx-status-success a {
+  color: #facc15;
+  text-decoration: underline;
+  margin-left: 4px;
+}
+
+.predictx-status-error {
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.25);
+  color: #f87171;
+}
+
+/* Footer */
+.predictx-footer {
+  text-align: center;
+  padding: 12px 16px;
+  background: rgba(0, 0, 0, 0.3);
+  font-size: 10px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.3);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+/* Loader */
+.predictx-loader {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(250, 204, 21, 0.3);
+  border-top-color: #facc15;
+  border-radius: 50%;
+  animation: predictx-spin 0.8s linear infinite;
+  margin-right: 8px;
+}
+
+@keyframes predictx-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Responsive */
+@media (max-width: 480px) {
+  .predictx-card {
+    border-radius: 12px;
+  }
+  
+  .predictx-question {
+    font-size: 15px;
+  }
+  
+  .predictx-btn {
+    padding: 12px 14px;
+    font-size: 13px;
+  }
+}

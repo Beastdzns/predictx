@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PredictX Blinks</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    body {
+      width: 320px;
+      min-height: 200px;
+      background: linear-gradient(135deg, #0a0a0a 0%, #1a1a2e 100%);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      color: #ffffff;
+    }
+    .container {
+      padding: 20px;
+    }
+    .header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 16px;
+    }
+    .logo {
+      font-size: 28px;
+    }
+    .title {
+      font-size: 18px;
+      font-weight: 700;
+      background: linear-gradient(135deg, #8B5CF6 0%, #14F195 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    .description {
+      font-size: 13px;
+      color: rgba(255, 255, 255, 0.7);
+      line-height: 1.5;
+      margin-bottom: 20px;
+    }
+    .feature {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 12px;
+      background: rgba(255, 255, 255, 0.05);
+      border-radius: 10px;
+      margin-bottom: 10px;
+    }
+    .feature-icon {
+      font-size: 20px;
+    }
+    .feature-text {
+      font-size: 13px;
+      color: rgba(255, 255, 255, 0.9);
+    }
+    .link {
+      display: block;
+      text-align: center;
+      margin-top: 16px;
+      padding: 12px 20px;
+      background: linear-gradient(135deg, #8B5CF6 0%, #14F195 100%);
+      color: #000;
+      text-decoration: none;
+      border-radius: 10px;
+      font-weight: 700;
+      font-size: 14px;
+      transition: opacity 0.2s;
+    }
+    .link:hover {
+      opacity: 0.9;
+    }
+    .footer {
+      text-align: center;
+      margin-top: 20px;
+      font-size: 11px;
+      color: rgba(255, 255, 255, 0.4);
+    }
+    .badge {
+      display: inline-block;
+      padding: 4px 8px;
+      background: rgba(139, 92, 246, 0.2);
+      border: 1px solid rgba(139, 92, 246, 0.4);
+      border-radius: 6px;
+      font-size: 10px;
+      color: #A78BFA;
+      margin-top: 4px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <span class="logo">⚡</span>
+      <span class="title">PredictX Blinks</span>
+    </div>
+    
+    <p class="description">
+      Trade prediction markets on Monad directly from Twitter/X. Powered by Privy embedded wallet for seamless signing.
+    </p>
+    
+    <div class="feature">
+      <span class="feature-icon">🎯</span>
+      <span class="feature-text">Trade YES/NO on any market</span>
+    </div>
+    
+    <div class="feature">
+      <span class="feature-icon">🔐</span>
+      <span class="feature-text">Privy embedded wallet signing</span>
+    </div>
+    
+    <div class="feature">
+      <span class="feature-icon">⚡</span>
+      <span class="feature-text">No MetaMask popups needed</span>
+    </div>
+    
+    <a href="https://predictx.vercel.app" target="_blank" class="link">
+      Open PredictX App
+    </a>
+    
+    <div class="footer">
+      <span class="badge">Monad Testnet</span>
+      <p style="margin-top: 8px;">Powered by PredictX · Privy</p>
+    </div>
+  </div>
+</body>
+</html>

@@ -1,0 +1,196 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+/* Tailwind v4 theme tokens */
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+
+  /* 👇 MAKE JETBRAINS MONO DEFAULT */
+  --font-sans: var(--font-jetbrains-mono);
+  --font-mono: var(--font-jetbrains-mono);
+  
+  /* Cyberpunk Theme Colors */
+  --color-neon-green: #14F195;
+  --color-solana-purple: #9945FF;
+  --color-dark-bg: #000000;
+  
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --radius-2xl: calc(var(--radius) + 8px);
+  --radius-3xl: calc(var(--radius) + 12px);
+  --radius-4xl: calc(var(--radius) + 16px);
+  
+  /* Cyberpunk Animations */
+  --animate-blink: blink 1.2s step-end infinite;
+  --animate-fade-in: fadeIn 0.5s ease-out forwards;
+}
+
+/* ✅ REMOVE Arial */
+body {
+  font-family: var(--font-jetbrains-mono), monospace;
+  background-color: #ffffff;
+  color: #000000;
+  min-height: 100dvh;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 4px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f5f5f5;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #d0d0d0;
+}
+
+/* Selection styling */
+::selection {
+  background-color: #14F195;
+  color: #000000;
+}
+
+:root {
+  --radius: 0.125rem;
+  --background: #ffffff;
+  --foreground: #000000;
+  --card: #ffffff;
+  --card-foreground: #000000;
+  --popover: #f9f9f9;
+  --popover-foreground: #000000;
+  --primary: #14F195;
+  --primary-foreground: #000000;
+  --secondary: #9945FF;
+  --secondary-foreground: #ffffff;
+  --muted: #f5f5f5;
+  --muted-foreground: #666666;
+  --accent: #14F195;
+  --accent-foreground: #000000;
+  --destructive: #ff4444;
+  --border: #e0e0e0;
+  --input: #f5f5f5;
+  --ring: #14F195;
+  --chart-1: #14F195;
+  --chart-2: #9945FF;
+  --chart-3: #00D4AA;
+  --chart-4: #7B61FF;
+  --chart-5: #0FBE7C;
+  --sidebar: #ffffff;
+  --sidebar-foreground: #000000;
+  --sidebar-primary: #14F195;
+  --sidebar-primary-foreground: #000000;
+  --sidebar-accent: #f5f5f5;
+  --sidebar-accent-foreground: #14F195;
+  --sidebar-border: #e0e0e0;
+  --sidebar-ring: #14F195;
+}
+
+.dark {
+  --background: #ffffff;
+  --foreground: #000000;
+  --card: #ffffff;
+  --card-foreground: #000000;
+  --popover: #f9f9f9;
+  --popover-foreground: #000000;
+  --primary: #14F195;
+  --primary-foreground: #000000;
+  --secondary: #9945FF;
+  --secondary-foreground: #ffffff;
+  --muted: #f5f5f5;
+  --muted-foreground: #666666;
+  --accent: #14F195;
+  --accent-foreground: #000000;
+  --destructive: #ff4444;
+  --border: #e0e0e0;
+  --input: #f5f5f5;
+  --ring: #14F195;
+  --chart-1: #14F195;
+  --chart-2: #9945FF;
+  --chart-3: #00D4AA;
+  --chart-4: #7B61FF;
+  --chart-5: #0FBE7C;
+  --sidebar: #ffffff;
+  --sidebar-foreground: #000000;
+  --sidebar-primary: #14F195;
+  --sidebar-primary-foreground: #000000;
+  --sidebar-accent: #f5f5f5;
+  --sidebar-accent-foreground: #14F195;
+  --sidebar-border: #e0e0e0;
+  --sidebar-ring: #14F195;
+}
+
+/* Cyberpunk Animations */
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+
+@keyframes fadeIn {
+  0% { 
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  100% { 
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-blink {
+  animation: blink 1.2s step-end infinite;
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.5s ease-out forwards;
+}
+
+/* Apply layer classes */
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+/* required for Chrome / Safari */
+.hide-scrollbar::-webkit-scrollbar {
+  display: none;
+}

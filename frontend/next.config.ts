@@ -2,7 +2,7 @@ import type { NextConfig } from "next";
 
 const withPWA = require('next-pwa')({
   dest: 'public',
-  disable: process.env.NODE_ENV === 'development',
+  disable: true, // Disable PWA for now
   register: true,
   skipWaiting: true,
   runtimeCaching: [
@@ -31,6 +31,7 @@ const withPWA = require('next-pwa')({
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
+  serverExternalPackages: ['mongoose'],
   images: {
     remotePatterns: [
       {

@@ -1,56 +1,55 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import AuthenticatedLayout from '@/components/authenticated-layout';
 import { usePrivy, useWallets } from '@privy-io/react-auth';
 import { createPublicClient, http, formatEther } from 'viem';
-import { mainnet } from 'viem/chains';
 import { ReceiveDialog } from '@/components/wallet/receive-dialog';
 import { SendDialog } from '@/components/wallet/send-dialog';
 import { SignMessageDialog } from '@/components/wallet/sign-message-dialog';
-import { X402WalletSetup } from '@/components/wallet/x402-wallet-setup';
-import { useX402Wallet } from '@/lib/use-x402-wallet';
+import { useMonadWallet, useMonadTransaction } from '@/lib/use-privy-monad';
+import { monadTestnetConfig, monadTestnet } from '@/lib/monad-config';
+import { setX402Wallet, clearX402Wallet } from '@/lib/x402-server-payment';
 import { Copy, ReceiptIcon, ArrowUpRight, ArrowDownLeft, Loader2, ExternalLink, Wallet2, CreditCard } from 'lucide-react';
-import { movementBedrockConfig } from '@/lib/movement-bedrock-config';
-
-interface Transaction {
-  hash: string;
-  type: string;
-  success: boolean;
-  timestamp: string;
-  sender: string;
-  gasUsed: string;
-  version: string;
-  payload?: {
-    function?: string;
-    arguments?: string[];
-  };
-  events?: Array<{
-    type: string;
-    data: Record<string, unknown>;
-  }>;
-}
 
 type WalletView = 'main' | 'micropayments';
 
+// EVM transaction type for Monad
+interface EvmTransaction {
+  hash: string;
+  from: string;
+  to: string;
+  value: string;
+  blockNumber: string;
+  timeStamp: string;
+  isError: string;
+  txreceipt_status: string;
+}
+
 export default function WalletPage() {
   const { exportWallet } = usePrivy();
-  const { wallets } = useWallets();
-  const embeddedWallet = wallets.find(
-    (wallet) => (wallet as any).walletClientType === 'privy'
-  );
-
-  // x402 Micropayments Wallet
+  
+  // Use Monad wallet hook (Privy EVM embedded wallet)
   const { 
-    wallet: x402Wallet, 
-    balance: x402Balance, 
-    isLoading: x402Loading, 
-    error: x402Error,
-    hasWallet: hasX402Wallet,
-    isReady: x402Ready,
-    createWallet: createX402Wallet, 
-    refreshBalance: refreshX402Balance 
-  } = useX402Wallet();
+    wallet: embeddedWallet, 
+    address: walletAddress,
+    hasWallet,
+    isReady,
+    switchToMonad,
+    getProvider
+  } = useMonadWallet();
+
+  // Monad transaction utilities
+  const { 
+    getBalance: getMonadBalance,
+    isLoading: txLoading,
+    error: txError,
+  } = useMonadTransaction();
+
+  // For x402 micropayments, use the same Privy wallet (no separate wallet creation needed)
+  const hasX402Wallet = hasWallet;
+  const x402Loading = txLoading;
+  const x402Error = txError;
 
   const [activeView, setActiveView] = useState<WalletView>('main');
   const [balance, setBalance] = useState<string>('0');
@@ -59,59 +58,106 @@ export default function WalletPage() {
   const [signOpen, setSignOpen] = useState(false);
   const [isLoadingBalance, setIsLoadingBalance] = useState(false);
   const [copied, setCopied] = useState(false);
-  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [transactions, setTransactions] = useState<EvmTransaction[]>([]);
   const [isLoadingTxns, setIsLoadingTxns] = useState(false);
-  const [x402Transactions, setX402Transactions] = useState<Transaction[]>([]);
+  const [x402Transactions, setX402Transactions] = useState<EvmTransaction[]>([]);
   const [isLoadingX402Txns, setIsLoadingX402Txns] = useState(false);
   const [copiedX402, setCopiedX402] = useState(false);
+  const [x402Balance, setX402Balance] = useState<string>('0');
+  const [x402Ready, setX402Ready] = useState(false);
 
   const copyToClipboard = () => {
-    if (embeddedWallet?.address) {
-      navigator.clipboard.writeText(embeddedWallet.address);
+    if (walletAddress) {
+      navigator.clipboard.writeText(walletAddress);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     }
   };
 
   const copyX402ToClipboard = () => {
-    if (x402Wallet?.address) {
-      navigator.clipboard.writeText(x402Wallet.address);
+    // For Monad, x402 uses the same embedded wallet
+    if (walletAddress) {
+      navigator.clipboard.writeText(walletAddress);
       setCopiedX402(true);
       setTimeout(() => setCopiedX402(false), 2000);
     }
   };
 
-  // Auto-create x402 wallet when switching to micropayments view
-  const [hasAttemptedCreate, setHasAttemptedCreate] = useState(false);
-  
-  useEffect(() => {
-    if (activeView === 'micropayments' && !hasX402Wallet && !x402Loading && !hasAttemptedCreate) {
-      setHasAttemptedCreate(true);
-      createX402Wallet();
+  // Refresh x402 balance (same wallet on Monad)
+  const refreshX402Balance = useCallback(async () => {
+    if (!walletAddress) return;
+    try {
+      const result = await getMonadBalance();
+      if (result !== null) {
+        // getMonadBalance returns { balanceWei, balanceMon }
+        const balanceMon = result.balanceMon || formatEther(result.balanceWei || 0n);
+        setX402Balance(balanceMon);
+        setX402Ready(parseFloat(balanceMon) > 0);
+        console.log('[Monad] Balance refreshed:', balanceMon, 'MON');
+      }
+    } catch (e) {
+      console.error('Failed to refresh x402 balance:', e);
     }
-  }, [activeView, hasX402Wallet, x402Loading, hasAttemptedCreate, createX402Wallet]);
+  }, [walletAddress, getMonadBalance]);
 
-  // Reset attempt flag when switching away from micropayments
+  // Auto-switch to Monad when viewing micropayments
   useEffect(() => {
-    if (activeView !== 'micropayments') {
-      setHasAttemptedCreate(false);
+    if (activeView === 'micropayments' && hasWallet) {
+      switchToMonad();
+      refreshX402Balance();
     }
-  }, [activeView]);
+  }, [activeView, hasWallet, switchToMonad, refreshX402Balance]);
 
-  // Fetch wallet balance
+  // Also refresh x402 balance on initial load if wallet exists
+  useEffect(() => {
+    if (hasWallet && walletAddress) {
+      refreshX402Balance();
+    }
+  }, [hasWallet, walletAddress, refreshX402Balance]);
+
+  // Register Privy wallet for x402 payments
+  useEffect(() => {
+    const registerX402Wallet = async () => {
+      if (hasWallet && walletAddress && embeddedWallet) {
+        try {
+          const provider = await getProvider();
+          if (provider) {
+            setX402Wallet(provider, walletAddress as `0x${string}`);
+            console.log('[x402] Wallet registered for micropayments:', walletAddress);
+          }
+        } catch (e) {
+          console.error('[x402] Failed to register wallet:', e);
+        }
+      }
+    };
+
+    registerX402Wallet();
+
+    // Cleanup on unmount
+    return () => {
+      // Don't clear on unmount - keep wallet registered globally
+    };
+  }, [hasWallet, walletAddress, embeddedWallet, getProvider]);
+
+  // Fetch wallet balance on Monad
   useEffect(() => {
     const fetchBalance = async () => {
-      if (!embeddedWallet?.address) return;
+      if (!walletAddress) return;
       setIsLoadingBalance(true);
       try {
+        console.log('[Monad] Fetching balance for:', walletAddress);
         const publicClient = createPublicClient({
-          chain: mainnet,
-          transport: http(),
+          chain: monadTestnet,
+          transport: http(monadTestnetConfig.rpcUrl),
         });
         const bal = await publicClient.getBalance({
-          address: embeddedWallet.address as `0x${string}`,
+          address: walletAddress as `0x${string}`,
         });
+        console.log('[Monad] Balance fetched:', formatEther(bal), 'MON');
         setBalance(formatEther(bal));
+        // Also update x402 balance since it's the same wallet
+        setX402Balance(formatEther(bal));
+        setX402Ready(parseFloat(formatEther(bal)) > 0);
       } catch (e) {
         console.error('Failed to fetch balance', e);
       }
@@ -119,42 +165,18 @@ export default function WalletPage() {
     };
 
     fetchBalance();
-  }, [embeddedWallet?.address]);
+  }, [walletAddress]);
 
-  // Fetch transaction history from Movement Bedrock
+  // Fetch transaction history from Monad (EVM)
   useEffect(() => {
     const fetchTransactions = async () => {
-      if (!embeddedWallet?.address) return;
+      if (!walletAddress) return;
       setIsLoadingTxns(true);
       try {
-        // Normalize address (remove 0x prefix if present for API)
-        const address = embeddedWallet.address.startsWith('0x') 
-          ? embeddedWallet.address 
-          : `0x${embeddedWallet.address}`;
-        
-        // Fetch from Movement Bedrock Testnet API
-        const response = await fetch(
-          `${movementBedrockConfig.rpcUrl}/accounts/${address}/transactions?limit=10`
-        );
-        
-        if (response.ok) {
-          const data = await response.json();
-          // Transform API response to our Transaction format
-          const txns: Transaction[] = data.map((tx: Record<string, unknown>) => ({
-            hash: tx.hash as string,
-            type: tx.type as string,
-            success: tx.success as boolean,
-            timestamp: tx.timestamp as string,
-            sender: tx.sender as string,
-            gasUsed: tx.gas_used as string,
-            version: tx.version as string,
-            payload: tx.payload as Transaction['payload'],
-            events: tx.events as Transaction['events'],
-          }));
-          setTransactions(txns);
-        } else {
-          console.log('No transactions found or API error:', response.status);
-        }
+        // Monad testnet may not have a block explorer API yet
+        // For now, we'll set empty transactions
+        // Future: integrate with Monad block explorer API when available
+        setTransactions([]);
       } catch (e) {
         console.error('Failed to fetch transactions:', e);
       }
@@ -162,39 +184,16 @@ export default function WalletPage() {
     };
 
     fetchTransactions();
-  }, [embeddedWallet?.address]);
+  }, [walletAddress]);
 
-  // Fetch x402 transaction history
+  // Fetch x402 transaction history (same wallet on Monad)
   useEffect(() => {
     const fetchX402Transactions = async () => {
-      if (!x402Wallet?.address) return;
+      if (!walletAddress) return;
       setIsLoadingX402Txns(true);
       try {
-        const address = x402Wallet.address.startsWith('0x') 
-          ? x402Wallet.address 
-          : `0x${x402Wallet.address}`;
-        
-        const response = await fetch(
-          `${movementBedrockConfig.rpcUrl}/accounts/${address}/transactions?limit=10`
-        );
-        
-        if (response.ok) {
-          const data = await response.json();
-          const txns: Transaction[] = data.map((tx: Record<string, unknown>) => ({
-            hash: tx.hash as string,
-            type: tx.type as string,
-            success: tx.success as boolean,
-            timestamp: tx.timestamp as string,
-            sender: tx.sender as string,
-            gasUsed: tx.gas_used as string,
-            version: tx.version as string,
-            payload: tx.payload as Transaction['payload'],
-            events: tx.events as Transaction['events'],
-          }));
-          setX402Transactions(txns);
-        } else {
-          console.log('No x402 transactions found or API error:', response.status);
-        }
+        // Same as main wallet on Monad - explorer API not yet available
+        setX402Transactions([]);
       } catch (e) {
         console.error('Failed to fetch x402 transactions:', e);
       }
@@ -202,11 +201,11 @@ export default function WalletPage() {
     };
 
     fetchX402Transactions();
-  }, [x402Wallet?.address]);
+  }, [walletAddress]);
 
-  // Helper to format timestamp
+  // Helper to format timestamp (EVM uses seconds)
   const formatTime = (timestamp: string) => {
-    const date = new Date(parseInt(timestamp) / 1000); // Movement uses microseconds
+    const date = new Date(parseInt(timestamp) * 1000); // EVM uses seconds
     const now = new Date();
     const diffMs = now.getTime() - date.getTime();
     const diffMins = Math.floor(diffMs / 60000);
@@ -220,27 +219,18 @@ export default function WalletPage() {
     return date.toLocaleDateString();
   };
 
-  // Helper to get transaction description
-  const getTxDescription = (tx: Transaction) => {
-    if (tx.payload?.function) {
-      const func = tx.payload.function;
-      if (func.includes('coin::transfer') || func.includes('aptos_account::transfer')) {
-        return 'Transfer';
-      }
-      if (func.includes('register')) {
-        return 'Register Account';
-      }
-      // Extract function name
-      const parts = func.split('::');
-      return parts[parts.length - 1] || 'Contract Call';
+  // Helper to get transaction description for EVM
+  const getTxDescription = (tx: EvmTransaction | { from?: string; to?: string; value?: string }) => {
+    if ('value' in tx && tx.value && BigInt(tx.value) > 0n) {
+      return 'MON Transfer';
     }
-    return tx.type === 'user_transaction' ? 'Transaction' : tx.type;
+    return 'Contract Call';
   };
 
   // Helper to check if tx is outgoing
-  const isOutgoing = (tx: Transaction) => {
-    const senderNormalized = tx.sender?.toLowerCase().replace('0x', '');
-    const walletNormalized = embeddedWallet?.address?.toLowerCase().replace('0x', '');
+  const isOutgoing = (tx: EvmTransaction | { from?: string }) => {
+    const senderNormalized = tx.from?.toLowerCase().replace('0x', '');
+    const walletNormalized = walletAddress?.toLowerCase().replace('0x', '');
     return senderNormalized === walletNormalized;
   };
 
@@ -282,11 +272,11 @@ export default function WalletPage() {
         {activeView === 'main' && (
           <>
             {/* Balance Card */}
-            {embeddedWallet && (
+            {hasWallet && (
               <div className="bg-black border border-yellow-500/10 rounded-2xl p-6 mb-6 shadow-sm shadow-yellow-500/40 max-w-md">
                 <h1 className="text-yellow-500 text-sm font-medium mb-4">Total Balance</h1>
-                <h1 className="text-yellow-300 border border-yellow-500/30 rounded-lg bg-zinc-950 p-2 text-4xl font-bold mb-4 flex">
-                  {isLoadingBalance ? '...' : parseFloat(balance).toFixed(4)} <span className='font-sans'><img src="/movement_logo.png" alt="" className='h-10 w-10 flex items-center justify-center'/></span>
+                <h1 className="text-yellow-300 border border-yellow-500/30 rounded-lg bg-zinc-950 p-2 text-4xl font-bold mb-4 flex items-center gap-2">
+                  {isLoadingBalance ? '...' : parseFloat(balance).toFixed(4)} <span className="text-lg text-yellow-500">MON</span>
                 </h1>
                 <div className="bg-zinc-950 border border-yellow-500/30 rounded-lg p-3">
                   <div className="flex items-center justify-between mb-2">
@@ -300,7 +290,7 @@ export default function WalletPage() {
                   </div>
                   <div className='bg-zinc-950 rounded-sm overflow-x-auto border border-yellow-400/30'>
                     <p className="text-white/40 p-2 font-mono text-xs">
-                      {embeddedWallet.address}
+                      {walletAddress}
                     </p>
                   </div>
                 </div>
@@ -311,7 +301,7 @@ export default function WalletPage() {
             <div className="grid grid-cols-3 gap-3 mb-8">
               <button
                 onClick={() => setSendOpen(true)}
-                disabled={!embeddedWallet}
+                disabled={!hasWallet}
                 className="bg-zinc-950 border border-yellow-500 rounded-xl p-4 hover:bg-zinc-800 transition-all group disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mx-auto text-yellow-400 h-7 w-7 mb-2"><path stroke="none" d="M0 0h24v24H0z" fill="none" /><path d="M10 14l11 -11" /><path d="M21 3l-6.5 18a.55 .55 0 0 1 -1 0l-3.5 -7l-7 -3.5a.55 .55 0 0 1 0 -1l18 -6.5" /></svg>
@@ -326,7 +316,7 @@ export default function WalletPage() {
               </button>
               <button
                 onClick={() => setSignOpen(true)}
-                disabled={!embeddedWallet}
+                disabled={!hasWallet}
                 className="bg-zinc-950 border border-yellow-500 rounded-xl p-4 hover:bg-zinc-800 transition-all group disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <img src="/sign.png" alt="" className='mx-auto h-8 w-9 mb-2' />
@@ -340,17 +330,17 @@ export default function WalletPage() {
               <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
-                    <img src="/movement_logo.png" alt="" className='w-10 h-10 rounded-full'/>
+                    <div className="w-10 h-10 rounded-full bg-purple-600 flex items-center justify-center text-white font-bold">M</div>
                     <div>
-                      <p className="text-white font-semibold">Movement</p>
-                      <p className="text-gray-400 text-xs">MOVE</p>
+                      <p className="text-white font-semibold">Monad</p>
+                      <p className="text-gray-400 text-xs">MON</p>
                     </div>
                   </div>
                   <div className="text-right">
                     <p className="text-white font-semibold">
                       {isLoadingBalance ? '...' : parseFloat(balance).toFixed(4)}
                     </p>
-                    <p className="text-gray-400 text-xs">MOVE</p>
+                    <p className="text-gray-400 text-xs">MON</p>
                   </div>
                 </div>
               </div>
@@ -411,7 +401,7 @@ export default function WalletPage() {
                             {tx.success ? 'Success' : 'Failed'}
                           </span>
                           <a
-                            href={`${movementBedrockConfig.blockExplorer}/txn/${tx.hash}`}
+                            href={`${monadTestnetConfig.blockExplorer}/tx/${tx.hash}`}
                             target="_blank"
                             rel="noopener noreferrer"
                             title="View on Explorer"
@@ -465,13 +455,10 @@ export default function WalletPage() {
                   <div className="bg-yellow-900/30 border border-yellow-500/50 rounded-xl p-6 text-center">
                     <Loader2 className="mx-auto mb-4 h-12 w-12 text-yellow-400 animate-spin" />
                     <h3 className="text-yellow-400 font-semibold mb-2">
-                      Creating Your Micropayments Wallet...
+                      Loading Wallet...
                     </h3>
                     <p className="text-gray-300 text-sm mb-2">
-                      Setting up your x402 wallet for secure micropayments.
-                    </p>
-                    <p className="text-gray-400 text-xs">
-                      💰 Auto-funding from testnet faucet...
+                      Connecting to your Privy wallet on Monad.
                     </p>
                   </div>
                 ) : x402Error ? (
@@ -479,7 +466,7 @@ export default function WalletPage() {
                     <div className="flex items-start gap-3">
                       <span className="text-2xl">⚠️</span>
                       <div className="flex-1">
-                        <h3 className="text-red-400 font-semibold mb-2">Wallet Creation Failed</h3>
+                        <h3 className="text-red-400 font-semibold mb-2">Wallet Connection Failed</h3>
                         <p className="text-gray-300 text-sm mb-4">
                           {x402Error}
                         </p>
@@ -488,20 +475,11 @@ export default function WalletPage() {
                             💡 <strong>Possible solutions:</strong>
                           </p>
                           <ul className="text-xs text-gray-400 space-y-1 list-disc list-inside">
-                            <li>Make sure the backend server is running</li>
-                            <li>Check if the API endpoint is accessible</li>
-                            <li>Verify your network connection</li>
+                            <li>Make sure you are logged in</li>
+                            <li>Try refreshing the page</li>
+                            <li>Check your network connection</li>
                           </ul>
                         </div>
-                        <button
-                          onClick={() => {
-                            setHasAttemptedCreate(false);
-                            createX402Wallet();
-                          }}
-                          className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg font-semibold transition-all"
-                        >
-                          🔄 Retry Creation
-                        </button>
                       </div>
                     </div>
                   </div>
@@ -509,7 +487,7 @@ export default function WalletPage() {
                   <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6 text-center">
                     <CreditCard className="mx-auto mb-4 h-12 w-12 text-yellow-400 opacity-70" />
                     <p className="text-gray-400 text-sm">
-                      Initializing micropayments wallet...
+                      Please log in to access micropayments.
                     </p>
                   </div>
                 )}
@@ -537,8 +515,8 @@ export default function WalletPage() {
                       </span>
                     </button>
                   </div>
-                  <h1 className="text-yellow-300 border border-yellow-500/30 rounded-lg bg-zinc-950 p-2 text-4xl font-bold mb-4 flex">
-                    {x402Loading ? '...' : parseFloat(x402Balance || '0').toFixed(8)} <span className='font-sans'><img src="/movement_logo.png" alt="" className='h-10 w-10 flex items-center justify-center'/></span>
+                  <h1 className="text-yellow-300 border border-yellow-500/30 rounded-lg bg-zinc-950 p-2 text-4xl font-bold mb-4 flex items-center gap-2">
+                    {x402Loading ? '...' : parseFloat(x402Balance || '0').toFixed(8)} <span className="text-lg text-yellow-500">MON</span>
                   </h1>
                   <div className="bg-zinc-950 border border-yellow-500/30 rounded-lg p-3">
                     <div className="flex items-center justify-between mb-2">
@@ -552,17 +530,17 @@ export default function WalletPage() {
                     </div>
                     <div className='bg-zinc-950 rounded-sm overflow-x-auto border border-yellow-400/30'>
                       <p className="text-white/40 p-2 font-mono text-xs">
-                        {x402Wallet?.address}
+                        {walletAddress}
                       </p>
                     </div>
                   </div>
                 </div>
 
-                {/* Get Testnet MOVE button - only show if wallet needs funding */}
+                {/* Get Testnet MON button - only show if wallet needs funding */}
                 {!x402Ready && (
                   <div className="mb-6">
                     <a
-                      href="https://faucet.movementnetwork.xyz/"
+                      href="https://faucet.monad.xyz/"
                       target="_blank"
                       rel="noopener noreferrer"
                       className="flex items-center justify-center gap-2 bg-yellow-400 border border-zinc-800 rounded-xl p-4 hover:bg-yellow-500 transition-all group"
@@ -571,7 +549,7 @@ export default function WalletPage() {
                         <path d="M7 10v12"/>
                         <path d="M15 5.88 14 10h5.83a2 2 0 0 1 1.92 2.56l-2.33 8A2 2 0 0 1 17.5 22H4a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h2.76a2 2 0 0 0 1.79-1.11L12 2h0a3.13 3.13 0 0 1 3 3.88Z"/>
                       </svg>
-                      <span className="text-black font-semibold text-sm">Get Testnet MOVE</span>
+                      <span className="text-black font-semibold text-sm">Get Testnet MON</span>
                     </a>
                   </div>
                 )}
@@ -596,7 +574,8 @@ export default function WalletPage() {
                   ) : (
                     <div className="bg-zinc-900 border border-zinc-800 rounded-xl divide-y divide-zinc-800">
                       {x402Transactions.map((tx) => {
-                        const isX402Outgoing = tx.sender?.toLowerCase().replace('0x', '') === x402Wallet?.address?.toLowerCase().replace('0x', '');
+                        const isX402Outgoing = tx.from?.toLowerCase().replace('0x', '') === walletAddress?.toLowerCase().replace('0x', '');
+                        const isSuccess = tx.txreceipt_status === '1' || tx.isError === '0';
                         return (
                           <div 
                             key={tx.hash} 
@@ -620,20 +599,20 @@ export default function WalletPage() {
                                     {isX402Outgoing ? 'Micropayment' : getTxDescription(tx)}
                                   </p>
                                   <p className="text-gray-500 text-xs">
-                                    {formatTime(tx.timestamp)}
+                                    {formatTime(tx.timeStamp)}
                                   </p>
                                 </div>
                               </div>
                               <div className="flex items-center gap-2">
                                 <span className={`text-xs px-2 py-0.5 rounded-full ${
-                                  tx.success 
+                                  isSuccess 
                                     ? 'bg-green-500/10 text-green-400' 
                                     : 'bg-red-500/10 text-red-400'
                                 }`}>
-                                  {tx.success ? 'Success' : 'Failed'}
+                                  {isSuccess ? 'Success' : 'Failed'}
                                 </span>
                                 <a
-                                  href={`${movementBedrockConfig.blockExplorer}/txn/${tx.hash}`}
+                                  href={`${monadTestnetConfig.blockExplorer}/tx/${tx.hash}`}
                                   target="_blank"
                                   rel="noopener noreferrer"
                                   title="View on Explorer"
@@ -664,7 +643,7 @@ export default function WalletPage() {
       <ReceiveDialog
         open={receiveOpen}
         onOpenChange={setReceiveOpen}
-        embeddedWalletAddress={embeddedWallet?.address}
+        embeddedWalletAddress={walletAddress || undefined}
       />
       <SendDialog
         open={sendOpen}

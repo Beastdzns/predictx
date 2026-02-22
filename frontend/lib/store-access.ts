@@ -1,7 +1,14 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import { formatEther } from 'viem';
 import { sendX402Payment, hasAppWallet } from './x402-server-payment';
-import { x402Config } from './movement-bedrock-config';
+import { x402Config } from './monad-config';
+
+// Helper to format wei price to human-readable MON
+const formatPrice = (weiString: string): string => {
+  const mon = formatEther(BigInt(weiString));
+  return `${mon} MON`;
+};
 
 interface AccessControlState {
   // Market-specific access (tracked by market ticker or event ticker)
@@ -97,14 +104,14 @@ export const useAccessControlStore = create<AccessControlState>()(
         if (get().marketAccess[marketId]) return true;
         
         if (!hasAppWallet()) {
-          alert('Please set up your x402 payment wallet first. Go to Settings to configure.');
+          alert('Wallet not ready. Please wait a moment and try again, or visit the Wallet page to check your balance.');
           return false;
         }
 
         const confirmed = window.confirm(
           '🔒 Access Market Data\n\n' +
           'This will unlock market probability, volume, and open interest data for this specific market.\n\n' +
-          `Cost: ${x402Config.pricing.marketData} MOVE\n\n` +
+          `Cost: ${formatPrice(x402Config.pricing.marketData)}\n\n` +
           'Do you want to proceed?'
         );
         
@@ -132,14 +139,14 @@ export const useAccessControlStore = create<AccessControlState>()(
         if (get().chartAccess[marketId]) return true;
         
         if (!hasAppWallet()) {
-          alert('Please set up your x402 payment wallet first. Go to Settings to configure.');
+          alert('Wallet not ready. Please wait a moment and try again, or visit the Wallet page to check your balance.');
           return false;
         }
 
         const confirmed = window.confirm(
           '🔒 Access Market Charts\n\n' +
           'This will unlock historical price charts and market trends for this specific market.\n\n' +
-          `Cost: ${x402Config.pricing.charts} MOVE\n\n` +
+          `Cost: ${formatPrice(x402Config.pricing.charts)}\n\n` +
           'Do you want to proceed?'
         );
         
@@ -167,14 +174,14 @@ export const useAccessControlStore = create<AccessControlState>()(
         if (get().sentimentAccess[marketId]) return true;
         
         if (!hasAppWallet()) {
-          alert('Please set up your x402 payment wallet first. Go to Settings to configure.');
+          alert('Wallet not ready. Please wait a moment and try again, or visit the Wallet page to check your balance.');
           return false;
         }
 
         const confirmed = window.confirm(
           '🔒 Access Market Sentiment\n\n' +
           'This will unlock AI-powered sentiment analysis and recommendations for this event.\n\n' +
-          `Cost: ${x402Config.pricing.sentiment} MOVE\n\n` +
+          `Cost: ${formatPrice(x402Config.pricing.sentiment)}\n\n` +
           'Do you want to proceed?'
         );
         
@@ -202,14 +209,14 @@ export const useAccessControlStore = create<AccessControlState>()(
         if (get().orderbookAccess[marketId]) return true;
         
         if (!hasAppWallet()) {
-          alert('Please set up your x402 payment wallet first. Go to Settings to configure.');
+          alert('Wallet not ready. Please wait a moment and try again, or visit the Wallet page to check your balance.');
           return false;
         }
 
         const confirmed = window.confirm(
           '🔒 Access Order Book\n\n' +
           'This will unlock real-time order book data showing all buy and sell orders for this market.\n\n' +
-          `Cost: ${x402Config.pricing.orderbook} MOVE\n\n` +
+          `Cost: ${formatPrice(x402Config.pricing.orderbook)}\n\n` +
           'Do you want to proceed?'
         );
         
@@ -237,14 +244,14 @@ export const useAccessControlStore = create<AccessControlState>()(
         if (get().tradeCalculatorAccess[marketId]) return true;
         
         if (!hasAppWallet()) {
-          alert('Please set up your x402 payment wallet first. Go to Settings to configure.');
+          alert('Wallet not ready. Please wait a moment and try again, or visit the Wallet page to check your balance.');
           return false;
         }
 
         const confirmed = window.confirm(
           '🔒 Access Trade Calculator\n\n' +
           'This will unlock the trading calculator to calculate potential profits for this market.\n\n' +
-          `Cost: ${x402Config.pricing.calculator} MOVE\n\n` +
+          `Cost: ${formatPrice(x402Config.pricing.calculator)}\n\n` +
           'Do you want to proceed?'
         );
         
@@ -272,14 +279,14 @@ export const useAccessControlStore = create<AccessControlState>()(
         if (get().activityAccess[marketId]) return true;
         
         if (!hasAppWallet()) {
-          alert('Please set up your x402 payment wallet first. Go to Settings to configure.');
+          alert('Wallet not ready. Please wait a moment and try again, or visit the Wallet page to check your balance.');
           return false;
         }
 
         const confirmed = window.confirm(
           '🔒 Access Recent Activity\n\n' +
           'This will unlock recent trades and market activity data for this market/event.\n\n' +
-          `Cost: ${x402Config.pricing.activity} MOVE\n\n` +
+          `Cost: ${formatPrice(x402Config.pricing.activity)}\n\n` +
           'Do you want to proceed?'
         );
         
@@ -311,7 +318,7 @@ export const useAccessControlStore = create<AccessControlState>()(
         }
         
         if (!hasAppWallet()) {
-          alert('Please set up your x402 payment wallet first. Go to Settings to configure.');
+          alert('Wallet not ready. Please wait a moment and try again, or visit the Wallet page to check your balance.');
           return false;
         }
 
@@ -319,7 +326,7 @@ export const useAccessControlStore = create<AccessControlState>()(
           '📝 Post to Community\n\n' +
           'Do you want to create a new post?\n' +
           'Access will be valid for 24 hours.\n\n' +
-          `Cost: ${x402Config.pricing.socialPost} MOVE\n\n` +
+          `Cost: ${formatPrice(x402Config.pricing.socialPost)}\n\n` +
           'Click OK to proceed.'
         );
         
@@ -349,7 +356,7 @@ export const useAccessControlStore = create<AccessControlState>()(
         }
         
         if (!hasAppWallet()) {
-          alert('Please set up your x402 payment wallet first. Go to Settings to configure.');
+          alert('Wallet not ready. Please wait a moment and try again, or visit the Wallet page to check your balance.');
           return false;
         }
 
@@ -357,7 +364,7 @@ export const useAccessControlStore = create<AccessControlState>()(
           '🔓 Unlock Community Feed\n\n' +
           'This will reveal all posts and discussions.\n' +
           'Access will be valid for 24 hours.\n\n' +
-          `Cost: ${x402Config.pricing.socialView} MOVE\n\n` +
+          `Cost: ${formatPrice(x402Config.pricing.socialView)}\n\n` +
           'Do you want to proceed?'
         );
         
@@ -387,7 +394,7 @@ export const useAccessControlStore = create<AccessControlState>()(
         }
         
         if (!hasAppWallet()) {
-          alert('Please set up your x402 payment wallet first. Go to Settings to configure.');
+          alert('Wallet not ready. Please wait a moment and try again, or visit the Wallet page to check your balance.');
           return false;
         }
 
@@ -395,7 +402,7 @@ export const useAccessControlStore = create<AccessControlState>()(
           '💬 Post Comment\n\n' +
           'Do you want to post this comment?\n' +
           'Access will be valid for 24 hours.\n\n' +
-          `Cost: ${x402Config.pricing.socialComment} MOVE\n\n` +
+          `Cost: ${formatPrice(x402Config.pricing.socialComment)}\n\n` +
           'Click OK to proceed.'
         );
         

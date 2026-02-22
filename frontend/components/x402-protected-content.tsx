@@ -17,7 +17,7 @@ import { ReactNode, useState, useCallback } from 'react';
 import { Lock, Loader2, CheckCircle, AlertCircle } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { x402Fetch } from '@/lib/x402-fetch';
-import { hasAppWallet } from '@/lib/x402-server-payment';
+import { hasAppWallet, sendX402Payment, getX402Address } from '@/lib/x402-server-payment';
 
 // Content type mappings
 export type X402ContentType = 
@@ -71,11 +71,23 @@ export default function X402ProtectedContent({
       return;
     }
 
+    const walletAddress = getX402Address();
+    if (!walletAddress) {
+      alert('Wallet address not available. Please try again.');
+      return;
+    }
+
     setState({ status: 'loading' });
 
     try {
       const url = `/api/x402/content/${contentType}/${contentId}`;
-      const response = await x402Fetch<{ data: unknown }>(url);
+      
+      // Create payment function for x402Fetch
+      const sendPayment = async (recipient: `0x${string}`, amountWei: bigint): Promise<string> => {
+        return sendX402Payment(recipient, amountWei.toString());
+      };
+
+      const response = await x402Fetch<{ data: unknown }>(url, sendPayment, walletAddress);
 
       if (response.success && response.data) {
         const unlockedData = (response.data as { data?: unknown }).data || response.data;
@@ -223,11 +235,22 @@ export function useX402Content<T = unknown>(contentType: X402ContentType, conten
       return { success: false, error: 'No wallet configured' };
     }
 
+    const walletAddress = getX402Address();
+    if (!walletAddress) {
+      return { success: false, error: 'Wallet address not available' };
+    }
+
     setState(prev => ({ ...prev, loading: true }));
 
     try {
       const url = `/api/x402/content/${contentType}/${contentId}`;
-      const response = await x402Fetch<{ data: T }>(url);
+      
+      // Create payment function for x402Fetch
+      const sendPayment = async (recipient: `0x${string}`, amountWei: bigint): Promise<string> => {
+        return sendX402Payment(recipient, amountWei.toString());
+      };
+
+      const response = await x402Fetch<{ data: T }>(url, sendPayment, walletAddress);
 
       if (response.success && response.data) {
         const data = (response.data as { data?: T }).data as T;

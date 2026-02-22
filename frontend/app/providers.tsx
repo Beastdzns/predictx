@@ -1,17 +1,70 @@
 'use client';
 
-import { PrivyProvider } from '@privy-io/react-auth';
+import { useEffect, useCallback } from 'react';
+import { PrivyProvider, usePrivy, useSendTransaction } from '@privy-io/react-auth';
 import { usePathname } from 'next/navigation';
+import { monadTestnet } from '@/lib/monad-config';
 import Appbar from '@/components/shared/appbar';
 import Bottombar from '@/components/shared/bottombar';
 import { useWalletSync } from '@/lib/use-wallet-sync';
+import { useMonadWallet } from '@/lib/use-privy-monad';
+import { setX402Wallet, clearX402Wallet } from '@/lib/x402-server-payment';
 
 function LayoutWrapper({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const isEventPage = pathname?.startsWith('/events/');
-
-  // Sync wallet with access control store
   useWalletSync();
+
+  // Register x402 wallet globally when authenticated
+  const { authenticated } = usePrivy();
+  const { address: walletAddress, hasWallet } = useMonadWallet();
+  
+  // Use Privy's sendTransaction hook for headless signing
+  const { sendTransaction } = useSendTransaction();
+
+  // Create a wrapper function that matches our expected signature
+  const wrappedSendTransaction = useCallback(
+    async (params: { to: `0x${string}`; value: bigint; chainId: number }) => {
+      const result = await sendTransaction(
+        {
+          to: params.to,
+          value: params.value,
+          chainId: params.chainId,
+        },
+        {
+          // Disable all wallet UIs for headless signing
+          uiOptions: { showWalletUIs: false },
+        }
+      );
+      console.log('[Providers] sendTransaction result:', result);
+      // Privy returns { hash, transactionHash, or other variations }
+      const txHash = (result as { transactionHash?: string; hash?: string }).transactionHash 
+        || (result as { transactionHash?: string; hash?: string }).hash 
+        || (typeof result === 'string' ? result : undefined);
+      if (!txHash) {
+        console.error('[Providers] No transaction hash in result:', result);
+        throw new Error('Transaction submitted but no hash returned');
+      }
+      return { transactionHash: txHash as `0x${string}` };
+    },
+    [sendTransaction]
+  );
+
+  useEffect(() => {
+    if (authenticated && hasWallet && walletAddress && typeof sendTransaction === 'function') {
+      setX402Wallet(wrappedSendTransaction, walletAddress as `0x${string}`);
+      console.log('[Providers] x402 wallet registered with headless sendTransaction:', walletAddress);
+    } else if (!authenticated) {
+      clearX402Wallet();
+    } else {
+      console.log('[Providers] Waiting for wallet to be ready...', {
+        authenticated,
+        hasWallet,
+        walletAddress,
+        sendTransactionReady: typeof sendTransaction === 'function'
+      });
+    }
+  }, [authenticated, hasWallet, walletAddress, wrappedSendTransaction, sendTransaction]);
 
   return (
     <div suppressHydrationWarning>
@@ -42,20 +95,18 @@ export default function Providers({ children }: { children: React.ReactNode }) {
     <PrivyProvider
       appId={appId}
       config={{
-        // Configure embedded wallets
+        // EVM embedded wallets — auto-create on login for Monad Testnet
         embeddedWallets: {
-          ethereum: {
-            createOnLogin: 'all-users',
-          },
+          ethereum: { createOnLogin: 'all-users' },
         },
         appearance: {
           theme: 'dark',
-          accentColor: '#facc15',
+          accentColor: '#836ef9', // Monad purple
+          showWalletLoginFirst: false,
         },
-        // Login methods
         loginMethods: ['email', 'wallet', 'google', 'discord', 'github', 'twitter', 'sms', 'passkey'],
-        // Only show Aptos/Movement related options, hide EVM
-        walletConnectCloudProjectId: undefined,
+        defaultChain: monadTestnet,   // from wagmi/chains — chainId 10143
+        supportedChains: [monadTestnet],
       }}
     >
       <LayoutWrapper>

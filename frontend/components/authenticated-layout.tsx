@@ -3,6 +3,8 @@
 import { usePrivy } from '@privy-io/react-auth';
 import { useRouter, usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
+import { useMonadWallet } from '@/lib/use-privy-monad';
+import { setX402Wallet, clearX402Wallet } from '@/lib/x402-server-payment';
 
 interface Props {
   children: React.ReactNode;
@@ -14,11 +16,35 @@ export default function AuthenticatedLayout({ children }: Props) {
   const { ready, authenticated, login } = usePrivy();
   const [isChecking, setIsChecking] = useState(true);
 
+  // Get Monad wallet for x402 registration
+  const { wallet: embeddedWallet, address: walletAddress, hasWallet, getProvider } = useMonadWallet();
+
   useEffect(() => {
     if (ready) {
       setIsChecking(false);
     }
   }, [ready]);
+
+  // Register x402 wallet globally when authenticated
+  useEffect(() => {
+    const registerX402 = async () => {
+      if (authenticated && hasWallet && walletAddress && embeddedWallet) {
+        try {
+          const provider = await getProvider();
+          if (provider) {
+            setX402Wallet(provider, walletAddress as `0x${string}`);
+            console.log('[AuthLayout] x402 wallet registered:', walletAddress);
+          }
+        } catch (e) {
+          console.error('[AuthLayout] Failed to register x402 wallet:', e);
+        }
+      } else if (!authenticated) {
+        clearX402Wallet();
+      }
+    };
+
+    registerX402();
+  }, [authenticated, hasWallet, walletAddress, embeddedWallet, getProvider]);
 
   if (!ready || isChecking) {
     return (

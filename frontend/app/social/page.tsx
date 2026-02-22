@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { useReplyDialogStore } from '@/lib/store-reply-dialog';
 import { x402Fetch } from '@/lib/x402-fetch';
-import { hasAppWallet } from '@/lib/x402-server-payment';
+import { hasAppWallet, sendX402Payment, getX402Address } from '@/lib/x402-server-payment';
 
 interface Reply {
   _id: string;
@@ -151,9 +151,19 @@ export default function SocialPage() {
       return false;
     }
     
+    const walletAddress = getX402Address();
+    if (!walletAddress) {
+      alert('Wallet address not available. Please try again.');
+      return false;
+    }
+
+    const sendPayment = async (recipient: `0x${string}`, amountWei: bigint): Promise<string> => {
+      return sendX402Payment(recipient, amountWei.toString());
+    };
+    
     setAccessLoading('view');
     try {
-      const result = await x402Fetch('/api/x402/content/social_view/feed');
+      const result = await x402Fetch('/api/x402/content/social_view/feed', sendPayment, walletAddress);
       if (result.success) {
         setHasSocialViewAccess(true);
         console.log(`[x402] Social view unlocked. TX: ${result.tx_hash}`);
@@ -176,9 +186,19 @@ export default function SocialPage() {
       return false;
     }
     
+    const walletAddress = getX402Address();
+    if (!walletAddress) {
+      alert('Wallet address not available. Please try again.');
+      return false;
+    }
+
+    const sendPayment = async (recipient: `0x${string}`, amountWei: bigint): Promise<string> => {
+      return sendX402Payment(recipient, amountWei.toString());
+    };
+    
     setAccessLoading('post');
     try {
-      const result = await x402Fetch('/api/x402/content/social_post/create');
+      const result = await x402Fetch('/api/x402/content/social_post/create', sendPayment, walletAddress);
       if (result.success) {
         setHasSocialPostAccess(true);
         console.log(`[x402] Social post access unlocked. TX: ${result.tx_hash}`);
@@ -201,9 +221,19 @@ export default function SocialPage() {
       return false;
     }
     
+    const walletAddress = getX402Address();
+    if (!walletAddress) {
+      alert('Wallet address not available. Please try again.');
+      return false;
+    }
+
+    const sendPayment = async (recipient: `0x${string}`, amountWei: bigint): Promise<string> => {
+      return sendX402Payment(recipient, amountWei.toString());
+    };
+    
     setAccessLoading('comment');
     try {
-      const result = await x402Fetch('/api/x402/content/social_comment/reply');
+      const result = await x402Fetch('/api/x402/content/social_comment/reply', sendPayment, walletAddress);
       if (result.success) {
         setHasSocialCommentAccess(true);
         console.log(`[x402] Social comment access unlocked. TX: ${result.tx_hash}`);

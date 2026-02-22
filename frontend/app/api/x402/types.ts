@@ -1,15 +1,17 @@
 /**
- * x402 Protocol Types
+ * x402 Protocol Types - Monad Testnet Edition
  */
+
+import { x402Config, monadTestnetConfig } from '@/lib/monad-config';
 
 // 402 Payment Required response
 export interface PaymentRequiredResponse {
   status: 402;
   message: string;
   payment: {
-    amount: string;           // Amount in octas
+    amount: string;           // Amount in wei (18 decimals)
     recipient: string;        // Treasury address
-    chain_id: number;         // Movement chain ID
+    chain_id: number;         // Monad chain ID (10143)
     network: string;          // Network name
   };
   job_id: string;             // Unique job/request ID
@@ -21,7 +23,8 @@ export interface PaymentRequiredResponse {
 export interface XPaymentHeader {
   tx_hash: string;            // Transaction hash proving payment
   sender: string;             // Sender wallet address
-  amount: string;             // Amount paid (octas)
+  amount: string;             // Amount paid (wei)
+  chain_id: number;           // Chain ID
   job_id: string;             // Job ID from 402 response
   timestamp: number;          // Unix timestamp
 }
@@ -40,7 +43,7 @@ export interface PendingJob {
   job_id: string;
   content_type: string;       // 'market_data', 'chart', 'sentiment', etc.
   content_id: string;         // Market ID or other identifier
-  price: string;              // Price in octas
+  price: string;              // Price in wei
   wallet_address: string;     // User's wallet that should pay
   created_at: Date;
   expires_at: Date;
@@ -48,15 +51,15 @@ export interface PendingJob {
   tx_hash?: string;
 }
 
-// Content types and their prices
+// Content types and their prices (in wei, 18 decimals)
 export const CONTENT_PRICES: Record<string, string> = {
-  market_data: '100000',      // 0.001 MOVE
-  chart: '200000',            // 0.002 MOVE
-  sentiment: '300000',        // 0.003 MOVE
-  orderbook: '150000',        // 0.0015 MOVE
-  calculator: '100000',       // 0.001 MOVE
-  activity: '150000',         // 0.0015 MOVE
-  social_post: '500000',      // 0.005 MOVE
-  social_view: '200000',      // 0.002 MOVE
-  social_comment: '100000',   // 0.001 MOVE
+  market_data:    x402Config.pricing.marketData,     // 0.001 MON
+  chart:          x402Config.pricing.charts,          // 0.002 MON
+  sentiment:      x402Config.pricing.sentiment,       // 0.003 MON
+  orderbook:      x402Config.pricing.orderbook,       // 0.0015 MON
+  calculator:     x402Config.pricing.calculator,      // 0.001 MON
+  activity:       x402Config.pricing.activity,        // 0.0015 MON
+  social_post:    x402Config.pricing.socialPost,      // 0.005 MON
+  social_view:    x402Config.pricing.socialView,      // 0.002 MON
+  social_comment: x402Config.pricing.socialComment,   // 0.001 MON
 };

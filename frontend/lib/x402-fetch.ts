@@ -1,13 +1,13 @@
 /**
- * x402 Fetch Client
- * 
- * A fetch wrapper that handles the x402 payment protocol:
+ * x402 Fetch Client — Monad EVM Edition
+ *
+ * Handles the x402 payment protocol:
  * 1. Makes initial request
- * 2. If 402 received, sends payment
+ * 2. If 402 received, sends MON payment via Privy EVM wallet
  * 3. Retries with X-PAYMENT header
  */
 
-import { sendX402Payment, getStoredAppWallet } from './x402-server-payment';
+import { monadTestnetConfig } from './monad-config';
 
 export interface X402Response<T = unknown> {
   success: boolean;
@@ -21,7 +21,7 @@ export interface PaymentRequired {
   status: 402;
   message: string;
   payment: {
-    amount: string;
+    amount: string;  // in wei (18 decimals)
     recipient: string;
     chain_id: number;
     network: string;
@@ -33,31 +33,25 @@ export interface PaymentRequired {
 
 /**
  * Fetch with automatic x402 payment handling
+ * @param url - API endpoint
+ * @param sendPayment - function that sends the MON payment and returns txHash
+ * @param walletAddress - sender's EVM address
+ * @param options - fetch options
  */
 export async function x402Fetch<T = unknown>(
   url: string,
+  sendPayment: (recipient: `0x${string}`, amountWei: bigint) => Promise<string>,
+  walletAddress: string,
   options?: RequestInit
 ): Promise<X402Response<T>> {
-  const wallet = getStoredAppWallet();
-  
-  if (!wallet) {
-    return {
-      success: false,
-      error: 'No payment wallet configured. Please set up your x402 wallet first.',
-    };
-  }
-
-  // Add wallet address header
   const headers = new Headers(options?.headers);
-  headers.set('x-wallet-address', wallet.address);
+  headers.set('x-wallet-address', walletAddress);
   headers.set('Content-Type', 'application/json');
 
   try {
-    // First request - may return 402
     console.log(`[x402] Fetching: ${url}`);
     const response = await fetch(url, { ...options, headers });
 
-    // If not 402, return response directly
     if (response.status !== 402) {
       if (!response.ok) {
         const error = await response.json().catch(() => ({ error: 'Request failed' }));
@@ -68,41 +62,56 @@ export async function x402Fetch<T = unknown>(
     }
 
     // Handle 402 Payment Required
-    console.log(`[x402] Received 402 Payment Required`);
+    console.log(`[x402-fetch] Received 402 Payment Required`);
     const paymentRequired: PaymentRequired = await response.json();
-    
-    console.log(`[x402] Payment details:`, paymentRequired);
-    console.log(`[x402] Amount: ${paymentRequired.payment.amount} octas`);
-    console.log(`[x402] Job ID: ${paymentRequired.job_id}`);
+    console.log(`[x402-fetch] Raw 402 response:`, JSON.stringify(paymentRequired, null, 2));
+    console.log(`[x402-fetch] Amount: ${paymentRequired.payment.amount} wei | Job: ${paymentRequired.job_id}`);
+    const recipient = paymentRequired.payment.recipient;
+    console.log(`[x402-fetch] Recipient from 402: "${recipient}" (length: ${recipient?.length || 0})`);
 
-    // Send payment
-    console.log(`[x402] Sending payment...`);
-    const txHash = await sendX402Payment(
-      paymentRequired.payment.recipient,
-      paymentRequired.payment.amount
+    // Validate recipient is a proper 40-char EVM address (0x + 40 hex chars = 42 total)
+    if (!recipient || typeof recipient !== 'string') {
+      console.error(`[x402-fetch] FATAL: recipient is not a string:`, recipient);
+      return { success: false, error: 'Server returned invalid recipient address (not a string)' };
+    }
+    if (recipient.length !== 42) {
+      console.error(`[x402-fetch] FATAL: Invalid recipient address length: ${recipient.length}, expected 42`);
+      console.error(`[x402-fetch] FATAL: Bad recipient value: "${recipient}"`);
+      return { success: false, error: `Server returned invalid recipient address (${recipient.length} chars, expected 42)` };
+    }
+    if (!recipient.startsWith('0x')) {
+      console.error(`[x402-fetch] FATAL: Recipient does not start with 0x: ${recipient}`);
+      return { success: false, error: 'Server returned invalid recipient address (no 0x prefix)' };
+    }
+
+    // Send MON payment via wallet
+    console.log(`[x402-fetch] About to send payment to: "${recipient}"`);
+    const txHash = await sendPayment(
+      recipient as `0x${string}`,
+      BigInt(paymentRequired.payment.amount)
     );
-    console.log(`[x402] Payment sent: ${txHash}`);
+    console.log(`[x402-fetch] Payment sent: ${txHash}`);
 
-    // Create X-PAYMENT header
+    // Build X-PAYMENT header
     const xPayment = {
       tx_hash: txHash,
-      sender: wallet.address,
+      sender: walletAddress,
       amount: paymentRequired.payment.amount,
+      chain_id: monadTestnetConfig.chainId,
       job_id: paymentRequired.job_id,
       timestamp: Date.now(),
     };
 
-    // Retry with X-PAYMENT header
-    console.log(`[x402] Retrying with X-PAYMENT header...`);
     headers.set('x-payment', JSON.stringify(xPayment));
 
+    // Retry with payment proof
+    console.log(`[x402] Retrying with X-PAYMENT header...`);
     const retryResponse = await fetch(url, { ...options, headers });
 
     if (!retryResponse.ok) {
       const error = await retryResponse.json().catch(() => ({ error: 'Payment verification failed' }));
-      console.log('[x402] Retry failed:', error);
-      return { 
-        success: false, 
+      return {
+        success: false,
         error: error.details || error.error || 'Payment verification failed',
         tx_hash: txHash,
         paid: true,
@@ -110,13 +119,7 @@ export async function x402Fetch<T = unknown>(
     }
 
     const data = await retryResponse.json();
-    return { 
-      success: true, 
-      data,
-      tx_hash: txHash,
-      paid: true,
-    };
-
+    return { success: true, data, tx_hash: txHash, paid: true };
   } catch (error) {
     console.error('[x402] Fetch error:', error);
     return {
@@ -127,41 +130,22 @@ export async function x402Fetch<T = unknown>(
 }
 
 /**
- * Convenience methods for specific content types
+ * Convenience namespace for typed content requests
  */
 export const x402 = {
-  /**
-   * Fetch market data
-   */
-  async getMarketData(marketId: string) {
-    return x402Fetch(`/api/x402/content/market_data/${marketId}`);
+  async getMarketData(marketId: string, sendPayment: Parameters<typeof x402Fetch>[1], walletAddress: string) {
+    return x402Fetch(`/api/x402/content/market_data/${marketId}`, sendPayment, walletAddress);
   },
-
-  /**
-   * Fetch chart data
-   */
-  async getChartData(marketId: string) {
-    return x402Fetch(`/api/x402/content/chart/${marketId}`);
+  async getChartData(marketId: string, sendPayment: Parameters<typeof x402Fetch>[1], walletAddress: string) {
+    return x402Fetch(`/api/x402/content/chart/${marketId}`, sendPayment, walletAddress);
   },
-
-  /**
-   * Fetch sentiment analysis
-   */
-  async getSentiment(marketId: string) {
-    return x402Fetch(`/api/x402/content/sentiment/${marketId}`);
+  async getSentiment(marketId: string, sendPayment: Parameters<typeof x402Fetch>[1], walletAddress: string) {
+    return x402Fetch(`/api/x402/content/sentiment/${marketId}`, sendPayment, walletAddress);
   },
-
-  /**
-   * Fetch orderbook data
-   */
-  async getOrderbook(marketId: string) {
-    return x402Fetch(`/api/x402/content/orderbook/${marketId}`);
+  async getOrderbook(marketId: string, sendPayment: Parameters<typeof x402Fetch>[1], walletAddress: string) {
+    return x402Fetch(`/api/x402/content/orderbook/${marketId}`, sendPayment, walletAddress);
   },
-
-  /**
-   * Fetch recent activity
-   */
-  async getActivity(marketId: string) {
-    return x402Fetch(`/api/x402/content/activity/${marketId}`);
+  async getActivity(marketId: string, sendPayment: Parameters<typeof x402Fetch>[1], walletAddress: string) {
+    return x402Fetch(`/api/x402/content/activity/${marketId}`, sendPayment, walletAddress);
   },
 };

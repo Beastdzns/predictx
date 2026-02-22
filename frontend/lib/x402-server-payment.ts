@@ -1,111 +1,93 @@
 /**
- * x402 Server-Side Payment using Privy App-Owned Wallet
+ * x402 Payment Module for Monad Testnet
  * 
- * This module handles x402 micropayments using a Privy app-owned wallet
- * that can be signed server-side without user interaction.
+ * Uses Privy embedded EVM wallet for micropayments.
+ * No server-side signing needed - all transactions signed client-side.
  */
 
-import { movementBedrockConfig } from './movement-bedrock-config';
+import { createPublicClient, http, formatEther, parseEther } from 'viem';
+import { monadTestnet, monadTestnetConfig, x402Config } from './monad-config';
 
-// App-owned wallet stored in localStorage
-const STORAGE_KEY = 'x402-app-wallet';
+// Store the send function from Privy's useSendTransaction hook
+// This allows headless signing without approval popups
+type SendTransactionFn = (params: { to: `0x${string}`; value: bigint; chainId: number }) => Promise<{ transactionHash: `0x${string}` }>;
 
-export interface AppOwnedWallet {
-  walletId: string;
+let x402SendTransaction: SendTransactionFn | null = null;
+let x402WalletAddress: `0x${string}` | null = null;
+
+export interface X402WalletInfo {
   address: string;
-  publicKey: string;
+  balance: string;
 }
 
 /**
- * Get the stored app-owned wallet from localStorage
+ * Set the x402 wallet with a sendTransaction function for headless signing
+ * Call this from your React component with the sendTransaction from useSendTransaction hook
  */
-export function getStoredAppWallet(): AppOwnedWallet | null {
-  if (typeof window === 'undefined') return null;
-  
-  try {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    if (stored) {
-      return JSON.parse(stored);
-    }
-  } catch (e) {
-    console.error('[x402] Failed to read stored wallet:', e);
-  }
-  return null;
+export function setX402Wallet(
+  sendTransaction: SendTransactionFn,
+  address: `0x${string}`
+): void {
+  x402SendTransaction = sendTransaction;
+  x402WalletAddress = address;
+  console.log('[x402] Wallet configured with headless sendTransaction:', address);
 }
 
 /**
- * Store the app-owned wallet in localStorage
+ * Clear the x402 wallet (on logout)
  */
-export function storeAppWallet(wallet: AppOwnedWallet): void {
-  if (typeof window === 'undefined') return;
-  
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(wallet));
-    console.log('[x402] App wallet stored');
-  } catch (e) {
-    console.error('[x402] Failed to store wallet:', e);
-  }
+export function clearX402Wallet(): void {
+  x402SendTransaction = null;
+  x402WalletAddress = null;
+  console.log('[x402] Wallet cleared');
 }
 
 /**
- * Create a new app-owned wallet via the server
- * This wallet can be signed server-side for x402 payments
+ * Check if x402 wallet is configured
  */
-export async function createAppWallet(userId: string): Promise<AppOwnedWallet> {
-  console.log('[x402] Creating app-owned wallet for user:', userId);
-  
-  const response = await fetch('/api/movement/sign', {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ userId }),
+export function hasAppWallet(): boolean {
+  const hasWallet = typeof x402SendTransaction === 'function' && x402WalletAddress !== null;
+  console.log('[x402] hasAppWallet check:', { 
+    hasWallet, 
+    address: x402WalletAddress,
+    hasSendFn: typeof x402SendTransaction === 'function'
   });
-
-  if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.error || 'Failed to create app wallet');
-  }
-
-  const data = await response.json();
-  
-  if (!data.success || !data.walletId) {
-    throw new Error('Invalid response from wallet creation');
-  }
-
-  const wallet: AppOwnedWallet = {
-    walletId: data.walletId,
-    address: data.address,
-    publicKey: data.publicKey,
-  };
-
-  storeAppWallet(wallet);
-  return wallet;
+  return hasWallet;
 }
 
 /**
- * Get the app wallet balance in MOVE
+ * Get the x402 wallet address
  */
-export async function getAppWalletBalance(address: string): Promise<string> {
+export function getX402Address(): string | null {
+  return x402WalletAddress;
+}
+
+/**
+ * Get the stored app wallet (compatibility function)
+ */
+export function getStoredAppWallet(): X402WalletInfo | null {
+  if (!x402WalletAddress) return null;
+  return {
+    address: x402WalletAddress,
+    balance: '0', // Balance fetched separately
+  };
+}
+
+/**
+ * Get wallet balance in MON
+ */
+export async function getAppWalletBalance(address?: string): Promise<string> {
+  const addr = address || x402WalletAddress;
+  if (!addr) return '0';
+
   try {
-    const response = await fetch(
-      `${movementBedrockConfig.rpcUrl}/accounts/${address}/resources`
-    );
+    const publicClient = createPublicClient({
+      chain: monadTestnet,
+      transport: http(monadTestnetConfig.rpcUrl),
+    });
 
-    if (!response.ok) {
-      console.error('[x402] Failed to fetch balance:', response.status);
-      return '0';
-    }
-
-    const resources = await response.json();
-    const coinResource = resources.find(
-      (r: { type: string }) => r.type === '0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>'
-    );
-
-    if (coinResource) {
-      const balanceOctas = BigInt(coinResource.data.coin.value);
-      return (Number(balanceOctas) / 1e8).toFixed(8);
-    }
-    
-    return '0';
+    const balanceWei = await publicClient.getBalance({ address: addr as `0x${string}` });
+    return formatEther(balanceWei);
   } catch (e) {
     console.error('[x402] Error getting balance:', e);
     return '0';
@@ -113,80 +95,80 @@ export async function getAppWalletBalance(address: string): Promise<string> {
 }
 
 /**
- * Send an x402 payment using the app-owned wallet (server-side signing)
+ * Send an x402 payment using the Privy embedded wallet
+ * Tries wallet.sendTransaction() first (bypasses unified wallet check),
+ * falls back to viem walletClient if not available.
  * Returns the transaction hash on success
  */
 export async function sendX402Payment(
   recipientAddress: string,
-  amountOctas: string
+  amountWei: string
 ): Promise<string> {
-  const wallet = getStoredAppWallet();
+  if (!x402SendTransaction || !x402WalletAddress) {
+    throw new Error('No x402 wallet configured. Please connect your wallet first.');
+  }
+
+  console.log(`[x402-server-payment] Sending payment: ${amountWei} wei`);
+  console.log(`[x402-server-payment] Recipient: "${recipientAddress}" (length: ${recipientAddress?.length || 0})`);
+  console.log(`[x402-server-payment] From wallet: "${x402WalletAddress}" (length: ${x402WalletAddress?.length || 0})`);
   
-  if (!wallet) {
-    throw new Error('No app wallet configured. Please set up an x402 wallet first.');
+  // CRITICAL: Validate both addresses before building transaction
+  if (!recipientAddress || recipientAddress.length !== 42) {
+    throw new Error(`Invalid recipient address: "${recipientAddress}" (length: ${recipientAddress?.length || 0}, expected 42)`);
+  }
+  if (!x402WalletAddress || x402WalletAddress.length !== 42) {
+    throw new Error(`Invalid sender address: "${x402WalletAddress}" (length: ${x402WalletAddress?.length || 0}, expected 42)`);
+  }
+  
+  // Validate sendTransaction function is available
+  if (!x402SendTransaction || typeof x402SendTransaction !== 'function') {
+    throw new Error('x402 wallet not configured. Please ensure you are authenticated with Privy and your wallet is ready.');
   }
 
-  console.log(`[x402] Sending payment: ${amountOctas} octas to ${recipientAddress}`);
-  console.log(`[x402] From wallet: ${wallet.address}`);
-
-  const response = await fetch('/api/movement/sign', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      senderAddress: wallet.address,
-      recipientAddress,
-      amountOctas,
-      walletId: wallet.walletId,
-      publicKey: wallet.publicKey,
-    }),
-  });
-
-  if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.error || 'Payment failed');
+  try {
+    console.log(`[x402-server-payment] Using headless sendTransaction...`);
+    
+    // Use the stored sendTransaction function from useSendTransaction hook
+    // This signs headlessly without showing approval UI
+    const result = await x402SendTransaction({
+      to: recipientAddress as `0x${string}`,
+      value: BigInt(amountWei),
+      chainId: monadTestnetConfig.chainId,
+    });
+    
+    console.log(`[x402] Payment successful (headless): ${result.transactionHash}`);
+    return result.transactionHash;
+  } catch (e) {
+    console.error('[x402] Payment failed:', e);
+    throw new Error(e instanceof Error ? e.message : 'Payment failed');
   }
-
-  const data = await response.json();
-
-  if (!data.success || !data.txHash) {
-    throw new Error('Payment transaction failed');
-  }
-
-  console.log(`[x402] Payment successful: ${data.txHash}`);
-  return data.txHash;
 }
 
 /**
- * Check if the app wallet has sufficient balance for a payment
+ * Check if the wallet has sufficient balance for a payment
  */
-export async function hasEnoughBalance(amountOctas: string): Promise<boolean> {
-  const wallet = getStoredAppWallet();
-  if (!wallet) return false;
+export async function hasEnoughBalance(amountWei: string): Promise<boolean> {
+  if (!x402WalletAddress) return false;
 
-  const balance = await getAppWalletBalance(wallet.address);
-  const balanceOctas = BigInt(Math.floor(parseFloat(balance) * 1e8));
-  const required = BigInt(amountOctas);
-  
-  // Include buffer for gas (0.01 MOVE)
-  const gasBuffer = BigInt(1000000);
-  
-  return balanceOctas >= (required + gasBuffer);
+  const balance = await getAppWalletBalance();
+  const balanceWei = parseEther(balance);
+  const required = BigInt(amountWei);
+
+  // Include buffer for gas (0.001 MON)
+  const gasBuffer = parseEther('0.001');
+
+  return balanceWei >= (required + gasBuffer);
 }
 
 /**
- * Get the app wallet or throw if not configured
+ * Require wallet to be configured (throws if not)
  */
-export function requireAppWallet(): AppOwnedWallet {
-  const wallet = getStoredAppWallet();
-  if (!wallet) {
-    throw new Error('x402 wallet not configured. Please set up your payment wallet first.');
+export function requireAppWallet(): X402WalletInfo {
+  if (!x402WalletAddress) {
+    throw new Error('x402 wallet not configured. Please connect your wallet first.');
   }
-  return wallet;
-}
-
-/**
- * Check if an app wallet is configured
- */
-export function hasAppWallet(): boolean {
-  return getStoredAppWallet() !== null;
+  return {
+    address: x402WalletAddress,
+    balance: '0',
+  };
 }

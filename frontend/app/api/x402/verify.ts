@@ -1,28 +1,77 @@
 /**
  * x402 Protocol - Payment Verification
  * 
- * Verifies on-chain payments on Movement Bedrock Testnet
+ * Verifies on-chain payments on Monad Testnet (EVM)
  */
 
-import { movementBedrockConfig } from '@/lib/movement-bedrock-config';
+import { monadTestnetConfig, x402Config } from '@/lib/monad-config';
 import { PaymentVerification } from './types';
 
-const TREASURY_ADDRESS = '0x1c3aee2b139c069bac975c7f87c4dce8143285f1ec7df2889f5ae1c08ae1ba53';
-
 /**
- * Normalize Aptos/Movement address to standard 64-char format (without 0x)
- * Addresses are 32 bytes = 64 hex chars, but leading zeros may be dropped
+ * Normalize EVM address to lowercase for comparison
  */
 function normalizeAddress(address: string): string {
-  // Remove 0x prefix
-  let hex = address.startsWith('0x') ? address.slice(2) : address;
-  // Pad to 64 characters
-  hex = hex.padStart(64, '0');
-  return hex.toLowerCase();
+  return address.toLowerCase();
 }
 
 /**
- * Verify a payment transaction on-chain
+ * Wait for transaction receipt with retries
+ */
+async function waitForReceipt(txHash: string, maxWaitMs: number = 15000): Promise<{ receipt: unknown | null; tx: unknown | null }> {
+  const startTime = Date.now();
+  const pollInterval = 2000; // 2 seconds
+  
+  while (Date.now() - startTime < maxWaitMs) {
+    // Try to get receipt
+    const receiptResponse = await fetch(monadTestnetConfig.rpcUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        method: 'eth_getTransactionReceipt',
+        params: [txHash],
+        id: 1,
+      }),
+    });
+    const receiptData = await receiptResponse.json();
+    
+    if (receiptData.result) {
+      // Also fetch full tx details
+      const txResponse = await fetch(monadTestnetConfig.rpcUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          jsonrpc: '2.0',
+          method: 'eth_getTransactionByHash',
+          params: [txHash],
+          id: 2,
+        }),
+      });
+      const txData = await txResponse.json();
+      return { receipt: receiptData.result, tx: txData.result };
+    }
+    
+    // Wait before next poll
+    await new Promise(resolve => setTimeout(resolve, pollInterval));
+  }
+  
+  // Final attempt to at least get the transaction
+  const txResponse = await fetch(monadTestnetConfig.rpcUrl, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      jsonrpc: '2.0',
+      method: 'eth_getTransactionByHash',
+      params: [txHash],
+      id: 3,
+    }),
+  });
+  const txData = await txResponse.json();
+  return { receipt: null, tx: txData.result };
+}
+
+/**
+ * Verify a payment transaction on-chain via Monad RPC
  */
 export async function verifyPaymentOnChain(
   txHash: string,
@@ -33,91 +82,77 @@ export async function verifyPaymentOnChain(
   try {
     console.log(`[x402] Verifying payment: ${txHash}`);
     console.log(`[x402] Expected sender: ${expectedSender}`);
-    console.log(`[x402] Expected amount: ${expectedAmount}`);
+    console.log(`[x402] Expected amount: ${expectedAmount} wei`);
     
-    // Fetch transaction from Movement RPC
-    const response = await fetch(
-      `${movementBedrockConfig.rpcUrl}/transactions/by_hash/${txHash}`
-    );
-
-    if (!response.ok) {
-      if (response.status === 404) {
+    // Wait for transaction receipt with polling
+    const { receipt, tx } = await waitForReceipt(txHash, 15000);
+    
+    if (!receipt) {
+      if (!tx) {
         return { verified: false, error: 'Transaction not found' };
       }
-      return { verified: false, error: `RPC error: ${response.status}` };
+      // Transaction exists but not confirmed within timeout
+      // For better UX, we can trust the pending transaction if it looks correct
+      const pendingTx = tx as { from: string; to: string; value: string };
+      const senderMatch = normalizeAddress(pendingTx.from) === normalizeAddress(expectedSender);
+      const recipientMatch = normalizeAddress(pendingTx.to) === normalizeAddress(x402Config.recipientAddress);
+      const actualValue = BigInt(pendingTx.value);
+      const expectedValue = BigInt(expectedAmount);
+      const amountOk = actualValue >= expectedValue;
+      
+      if (senderMatch && recipientMatch && amountOk) {
+        console.log(`[x402] Transaction pending but looks valid, allowing...`);
+        return { 
+          verified: true, 
+          tx_hash: txHash,
+          sender: pendingTx.from,
+          amount: actualValue.toString(),
+        };
+      }
+      return { verified: false, error: 'Transaction pending and details do not match' };
     }
 
-    const tx = await response.json();
-    console.log(`[x402] Transaction data:`, JSON.stringify(tx, null, 2).slice(0, 500));
+    const receiptTyped = receipt as { status: string; from?: string; to?: string };
     
-    // Check if transaction is successful
-    if (!tx.success) {
+    // Check if transaction succeeded (status 0x1)
+    if (receiptTyped.status !== '0x1') {
       return { verified: false, error: 'Transaction failed on-chain' };
     }
 
-    // Check transaction type (should be aptos_account::transfer)
-    const payload = tx.payload;
-    console.log(`[x402] Payload function:`, payload?.function);
-    
-    if (!payload || payload.function !== '0x1::aptos_account::transfer') {
-      return { verified: false, error: `Invalid transaction type: ${payload?.function}` };
+    // Use transaction details for verification
+    const txTyped = tx as { from: string; to: string; value: string } | null;
+    if (!txTyped) {
+      return { verified: false, error: 'Could not fetch transaction details' };
     }
 
-    // Extract sender, recipient, amount
-    const sender = tx.sender;
-    const recipient = payload.arguments?.[0];
-    const amount = payload.arguments?.[1];
-    
-    console.log(`[x402] TX Sender: ${sender}`);
-    console.log(`[x402] TX Recipient: ${recipient}`);
-    console.log(`[x402] TX Amount: ${amount}`);
+    console.log(`[x402] TX From: ${txTyped.from}`);
+    console.log(`[x402] TX To: ${txTyped.to}`);
+    console.log(`[x402] TX Value: ${txTyped.value}`);
 
-    // Verify recipient is our treasury (normalize addresses for comparison)
-    const normalizedRecipient = normalizeAddress(recipient);
-    const normalizedTreasury = normalizeAddress(TREASURY_ADDRESS);
-    
-    if (normalizedRecipient !== normalizedTreasury) {
+    // Verify recipient is our treasury
+    const treasuryAddress = x402Config.recipientAddress;
+    if (normalizeAddress(txTyped.to) !== normalizeAddress(treasuryAddress)) {
       return { 
         verified: false, 
-        error: `Wrong recipient: ${recipient}, expected: ${TREASURY_ADDRESS}` 
+        error: `Wrong recipient: ${txTyped.to}, expected: ${treasuryAddress}` 
       };
     }
 
-    // Verify sender matches (normalize addresses)
-    const normalizedSender = normalizeAddress(sender);
-    const normalizedExpected = normalizeAddress(expectedSender);
-    
-    console.log(`[x402] Normalized sender: ${normalizedSender}`);
-    console.log(`[x402] Normalized expected: ${normalizedExpected}`);
-    
-    if (normalizedSender !== normalizedExpected) {
+    // Verify sender matches
+    if (normalizeAddress(txTyped.from) !== normalizeAddress(expectedSender)) {
       return { 
         verified: false, 
-        error: `Wrong sender: ${sender}, expected: ${expectedSender}` 
+        error: `Wrong sender: ${txTyped.from}, expected: ${expectedSender}` 
       };
     }
 
     // Verify amount (should be >= expected)
-    const paidAmount = BigInt(amount);
+    const paidAmount = BigInt(txTyped.value);
     const requiredAmount = BigInt(expectedAmount);
     if (paidAmount < requiredAmount) {
       return { 
         verified: false, 
-        error: `Insufficient payment: ${amount}, expected: ${expectedAmount}` 
-      };
-    }
-
-    // Check transaction age (timestamp is in microseconds)
-    const txTimestamp = Math.floor(parseInt(tx.timestamp) / 1000000);
-    const now = Math.floor(Date.now() / 1000);
-    const age = now - txTimestamp;
-    
-    console.log(`[x402] TX age: ${age}s (max: ${maxAgeSeconds}s)`);
-    
-    if (age > maxAgeSeconds) {
-      return { 
-        verified: false, 
-        error: `Transaction too old: ${age}s, max: ${maxAgeSeconds}s` 
+        error: `Insufficient payment: ${paidAmount.toString()}, expected: ${expectedAmount}` 
       };
     }
 
@@ -126,8 +161,8 @@ export async function verifyPaymentOnChain(
     return {
       verified: true,
       tx_hash: txHash,
-      sender: sender,
-      amount: amount,
+      sender: txTyped.from,
+      amount: paidAmount.toString(),
     };
 
   } catch (error) {
@@ -144,24 +179,43 @@ export async function verifyPaymentOnChain(
  */
 export async function checkTransactionStatus(txHash: string): Promise<'pending' | 'success' | 'failed' | 'not_found'> {
   try {
-    const response = await fetch(
-      `${movementBedrockConfig.rpcUrl}/transactions/by_hash/${txHash}`
-    );
+    // First check receipt
+    const receiptResponse = await fetch(monadTestnetConfig.rpcUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        method: 'eth_getTransactionReceipt',
+        params: [txHash],
+        id: 1,
+      }),
+    });
 
-    if (!response.ok) {
-      if (response.status === 404) {
-        return 'not_found';
-      }
-      return 'not_found';
+    const receiptData = await receiptResponse.json();
+    
+    if (receiptData.result) {
+      return receiptData.result.status === '0x1' ? 'success' : 'failed';
     }
 
-    const tx = await response.json();
+    // No receipt, check if tx exists (pending)
+    const txResponse = await fetch(monadTestnetConfig.rpcUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        method: 'eth_getTransactionByHash',
+        params: [txHash],
+        id: 2,
+      }),
+    });
+
+    const txData = await txResponse.json();
     
-    if (tx.type === 'pending_transaction') {
+    if (txData.result) {
       return 'pending';
     }
-    
-    return tx.success ? 'success' : 'failed';
+
+    return 'not_found';
   } catch {
     return 'not_found';
   }

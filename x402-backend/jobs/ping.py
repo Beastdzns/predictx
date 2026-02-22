@@ -18,8 +18,8 @@ class PingJob(Job):
 
     @classmethod
     def get_price(cls) -> Decimal:
-        # Return price in MOVE tokens (with 8 decimals)
-        return Decimal(PRICING.get("calculator", 100000)) / Decimal(100000000)
+        # Return price in MON tokens (18 decimals, standard EVM)
+        return Decimal(PRICING.get("calculator", 1000000000000000)) / Decimal(10**18)
 
     def validate_params(self) -> tuple[bool, str]:
         """Validate ping parameters"""

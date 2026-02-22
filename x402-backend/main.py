@@ -50,9 +50,9 @@ async def lifespan(app: FastAPI):
 
     is_connected = await payment_verifier.is_connected()
     if not is_connected:
-        print("WARNING: Not connected to Movement Bedrock Testnet!")
+        print("WARNING: Not connected to Monad Testnet!")
     else:
-        print("Connected to Movement Bedrock Testnet")
+        print("Connected to Monad Testnet")
 
     # Start background cleanup task
     cleanup_task = asyncio.create_task(cleanup_expired_jobs())
@@ -88,7 +88,7 @@ async def root():
     return {
         "service": "x402 Payment System",
         "status": "running",
-        "network": "Movement Bedrock Testnet",
+        "network": "Monad Testnet",
         "chain_id": CHAIN_ID,
         "connected": await payment_verifier.is_connected() if payment_verifier else False
     }
@@ -100,7 +100,7 @@ async def list_jobs():
     return {
         "jobs": job_registry.list_jobs(),
         "recipient_address": PAYMENT_RECIPIENT_ADDRESS,
-        "network": "Movement Bedrock Testnet",
+        "network": "Monad Testnet",
         "chain_id": CHAIN_ID
     }
 
@@ -132,7 +132,7 @@ async def request_job(job_request: JobRequest, request: Request):
 
     # Get price
     price = job_class.get_price()
-    # Note: price is in MOVE tokens with 8 decimals, not wei (18 decimals)
+    # Note: price is in MON tokens (18 decimals, standard EVM wei)
 
     # Check for X-PAYMENT header (x402 signature-based payment)
     x_payment = request.headers.get("X-PAYMENT") or request.headers.get("x-payment")
@@ -207,7 +207,7 @@ async def request_job(job_request: JobRequest, request: Request):
                 "amount": str(price),
                 "recipient_address": PAYMENT_RECIPIENT_ADDRESS,
                 "chain_id": CHAIN_ID,
-                "network": "Movement Bedrock Testnet"
+                "network": "Monad Testnet"
             },
             "expires_at": expiry.isoformat(),
             "timeout_seconds": PAYMENT_TIMEOUT_SECONDS

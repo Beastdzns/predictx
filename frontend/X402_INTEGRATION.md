@@ -1,12 +1,12 @@
 # x402 Payment Integration Guide
 
-This Next.js frontend now supports **x402 payment rails** with **Privy embedded wallets** on **Movement Bedrock Testnet**.
+This Next.js frontend now supports **x402 payment rails** with **Privy embedded wallets** on **Monad Testnet**.
 
 ## 🎯 Features
 
-- ✅ Pay-to-unlock premium features with native MOVE tokens
+- ✅ Pay-to-unlock premium features with native MON tokens
 - ✅ Privy embedded wallets (no seed phrase exposure)
-- ✅ Movement Bedrock Testnet integration (Aptos-compatible)
+- ✅ Monad Testnet integration (EVM-compatible)
 - ✅ Server-side transaction signing via Privy Node SDK
 - ✅ Real on-chain transaction verification
 
@@ -15,17 +15,17 @@ This Next.js frontend now supports **x402 payment rails** with **Privy embedded 
 All the following features now require on-chain payment:
 
 ### Market Features
-- **Market Data Access** - `0.001 MOVE` - Real-time market data
-- **Charts Access** - `0.002 MOVE` - Historical price charts
-- **Sentiment Analysis** - `0.003 MOVE` - AI-powered insights
-- **Order Book** - `0.0015 MOVE` - Real-time order data
-- **Trade Calculator** - `0.001 MOVE` - Profit calculations
-- **Recent Activity** - `0.0015 MOVE` - Trade history
+- **Market Data Access** - `0.001 MON` - Real-time market data
+- **Charts Access** - `0.002 MON` - Historical price charts
+- **Sentiment Analysis** - `0.003 MON` - AI-powered insights
+- **Order Book** - `0.0015 MON` - Real-time order data
+- **Trade Calculator** - `0.001 MON` - Profit calculations
+- **Recent Activity** - `0.0015 MON` - Trade history
 
 ### Social Features
-- **View Feed** - `0.002 MOVE` - Access community posts (24h)
-- **Create Post** - `0.005 MOVE` - Post to community (24h)
-- **Post Comment** - `0.001 MOVE` - Comment on posts (24h)
+- **View Feed** - `0.002 MON` - Access community posts (24h)
+- **Create Post** - `0.005 MON` - Post to community (24h)
+- **Post Comment** - `0.001 MON` - Comment on posts (24h)
 
 ## ⚙️ Configuration
 
@@ -40,6 +40,9 @@ PRIVY_APP_SECRET=your_privy_app_secret
 
 # x402 Backend
 NEXT_PUBLIC_X402_API_URL=http://localhost:8990
+
+# Treasury Address (your x402 recipient)
+NEXT_PUBLIC_X402_RECIPIENT=0xYourTreasuryAddress
 ```
 
 **Important**: Get your `PRIVY_APP_SECRET` from the [Privy Dashboard](https://dashboard.privy.io/) under Settings > API Keys.
@@ -49,15 +52,15 @@ NEXT_PUBLIC_X402_API_URL=http://localhost:8990
 1. Go to [Privy Dashboard](https://dashboard.privy.io/)
 2. Create a new app or use existing
 3. Copy your App ID and App Secret to `.env.local`
-4. Privy automatically supports Aptos/Movement chains via extended-chains
-5. The app uses `useCreateWallet({chainType: 'aptos'})` to create Movement wallets
+4. Privy automatically supports Monad via wagmi chains
+5. The app uses EVM embedded wallets with `monadTestnet` as default chain
 
-### 3. Movement Bedrock Testnet
+### 3. Monad Testnet
 
-- **RPC URL**: `https://testnet.movementnetwork.xyz/v1`
-- **Chain ID**: `250` (conceptual, Aptos-style)
-- **Explorer**: `https://explorer.movementnetwork.xyz/?network=testnet`
-- **Faucet**: Get testnet MOVE from Movement faucet
+- **RPC URL**: `https://testnet-rpc.monad.xyz`
+- **Chain ID**: `10143`
+- **Explorer**: `https://testnet.monadexplorer.com`
+- **Faucet**: Get testnet MON from Monad faucet
 
 ## 🔧 Technical Architecture
 
@@ -65,7 +68,7 @@ NEXT_PUBLIC_X402_API_URL=http://localhost:8990
 
 ```
 1. User clicks "Unlock" → Confirmation dialog with price
-2. Privy wallet sends MOVE transaction on Movement M1
+2. Privy wallet sends MON transaction on Monad Testnet
 3. Wait for transaction confirmation (1 block)
 4. Access granted locally via Zustand store
 5. Transaction hash logged for verification
@@ -74,22 +77,23 @@ NEXT_PUBLIC_X402_API_URL=http://localhost:8990
 ### Files Created/Modified
 
 #### New Files
-- `lib/movement-config.ts` - Movement M1 & x402 configuration
-- `lib/x402-payment.ts` - Payment utilities (sendNativePayment, ensureCorrectNetwork, etc.)
+- `lib/monad-config.ts` - Monad Testnet & x402 configuration
+- `lib/x402-evm-payment.ts` - Payment utilities (sendUnlockPayment, payAndUnlock, etc.)
+- `lib/privy-monad-signing.ts` - Privy wallet signing for Monad
 - `lib/use-wallet-sync.ts` - Hook to sync Privy wallet with access store
 
 #### Modified Files
-- `app/providers.tsx` - Added Movement M1 to Privy config, wallet sync
+- `app/providers.tsx` - Added Monad Testnet to Privy config, wallet sync
 - `lib/store-access.ts` - Converted to async payment flow with real transactions
 - `.env.local` - Added treasury address and API URL
 
 ### Key Functions
 
-#### `sendNativePayment(wallet, recipient, amount)`
-Sends MOVE tokens using Privy embedded wallet provider.
+#### `sendMonPayment(provider, senderAddress, recipientAddress, amountWei)`
+Sends MON tokens using Privy embedded wallet provider (viem).
 
-#### `ensureCorrectNetwork(wallet)`
-Auto-switches to Movement M1 or adds it to wallet.
+#### `waitForMonTransaction(txHash, timeout)`
+Waits for transaction to be mined on Monad.
 
 #### `useWalletSync()`
 React hook that syncs Privy wallet to access control store.
@@ -138,10 +142,10 @@ function MyComponent({ marketId }: { marketId: string }) {
    npm run dev
    ```
 3. **Login with Privy** (email, Google, etc.)
-4. **Get testnet MOVE** from Movement faucet
+4. **Get testnet MON** from Monad faucet
 5. **Click any "Unlock" button** - should:
    - Show confirmation dialog with price
-   - Send transaction to Movement M1
+   - Send transaction to Monad Testnet
    - Wait for confirmation
    - Grant access on success
 
@@ -157,12 +161,12 @@ npm run dev
 ```
 
 ### Network Not Switching
-- Check Privy config includes Movement M1 in `supportedChains`
+- Check Privy config includes Monad Testnet in `supportedChains`
 - Verify RPC URL is accessible
 - Try manually adding network in wallet
 
 ### Payment Fails
-- Ensure wallet has MOVE balance
+- Ensure wallet has MON balance
 - Check console for detailed error logs
 - Verify treasury address in `.env.local`
 
@@ -170,13 +174,18 @@ npm run dev
 
 To connect to a real backend with transaction verification:
 
-1. **Clone x402-utils backend**:
+1. **Start the x402 backend**:
    ```bash
-   git clone https://github.com/anton-io/x402-utils
-   cd x402-utils/prediction-market/backend
+   cd x402-backend
+   pip install -r requirements.txt
+   python main.py
    ```
 
-2. **Configure backend** (see x402-utils README)
+2. **Configure backend** environment variables in `.env`:
+   ```env
+   BASE_RPC=https://testnet-rpc.monad.xyz
+   RECIPIENT_ADDRESS=0xYourTreasuryAddress
+   ```
 
 3. **Update frontend** `.env.local`:
    ```env
@@ -185,17 +194,17 @@ To connect to a real backend with transaction verification:
 
 4. **Backend will**:
    - Receive requests with `X-PAYMENT` header
-   - Verify tx_hash on Movement M1 RPC
+   - Verify tx_hash on Monad Testnet RPC
    - Check sender, recipient, amount, chainId
-   - Return 200 if valid, 401 if invalid
+   - Return 200 if valid, 402 if payment required
 
 ## 🔗 Resources
 
 - [Privy Docs](https://docs.privy.io/)
-- [Movement Network](https://movementnetwork.xyz/)
+- [Monad Network](https://monad.xyz/)
+- [Monad Testnet Explorer](https://testnet.monadexplorer.com)
 - [x402 Protocol](https://github.com/anton-io/x402-utils)
-- [Movement M1 Explorer](https://explorer.devnet.imola.movementlabs.xyz)
 
 ---
 
-**Built with Movement M1 + Privy + x402** 🚀
+**Built with Monad Testnet + Privy + x402** 🚀
